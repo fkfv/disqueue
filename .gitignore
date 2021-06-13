@@ -1,0 +1,2 @@
+# ignore build directory created in the compilation example
+build/
