@@ -88,6 +88,10 @@ struct evws_message {
   struct evbuffer *buffer;
 
   ev_uint8_t opcode;
+
+  /* if this is set the message should not be freed after the callback, the
+     new owner will free it instead. */
+  int own;
 };
 
 /* callback to try upgrade requests */

@@ -106,3 +106,12 @@ void evws_message_free(struct evws_message *msg);
 struct evws_connection *evws_message_get_connection(struct evws_message *msg);
 struct evbuffer *evws_message_get_buffer(struct evws_message *msg);
 ev_uint8_t evws_message_get_opcode(struct evws_message *msg);
+
+/**
+ * Own a message. When the message is owned it will not be freed after the
+ * data notify callback is invoked. It must be manually freed using
+ * evws_message_free().
+ *
+ * @param conn an evws_message that is still in the callback stage
+ */
+void evws_message_own(struct evws_message *msg);

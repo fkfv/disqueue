@@ -340,6 +340,11 @@ ev_uint8_t evws_message_get_opcode(struct evws_message *msg)
   return msg->opcode;
 }
 
+void evws_message_own(struct evws_message *msg)
+{
+  msg->own = 1;
+}
+
 void evws_connection_event_cb_(struct bufferevent *bev, short events,
                                void *user)
 {
@@ -455,6 +460,9 @@ void evws_wslay_on_msg_recv_callback_(wslay_event_context_ptr ctx,
         }
 
         ws->evws->datacb(message, ws->evws->datacbarg);
+        if (!message->own) {
+          evws_message_free(message);
+        }
       }
     }
   }
