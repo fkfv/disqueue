@@ -68,6 +68,9 @@ struct evws {
   void (*datacb)(struct evws_message *, void *);
   void *datacbarg;
 
+  void (*opencb)(struct evws_connection *, void *);
+  void *opencbarg;
+
   void (*errorcb)(struct evws_connection *, void *);
   void *errorcbarg;
 

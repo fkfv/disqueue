@@ -195,6 +195,10 @@ void evws_upgrade_http_cb_(struct evhttp_request *req, void *user)
   /* http -> ws transition complete, notify the ws object about the new
      connection. */
   TAILQ_INSERT_TAIL(&ws->connections, connection, next);
+
+  if (ws->opencb) {
+    ws->opencb(connection, ws->opencbarg);
+  }
 }
 
 struct evws *evws_new(struct evhttp *http)
@@ -233,6 +237,13 @@ void evws_set_cb(struct evws *ws,
 {
   ws->datacb = cb;
   ws->datacbarg = arg;
+}
+
+void evws_set_open_cb(struct evws *ws,
+                      void (*cb)(struct evws_connection *, void *), void *arg)
+{
+  ws->opencb = cb;
+  ws->opencbarg = arg;
 }
 
 void evws_set_error_cb(struct evws *ws,

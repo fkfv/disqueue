@@ -73,6 +73,9 @@ int evws_unbind_path(struct evws *ws, const char *path);
 void evws_set_cb(struct evws *ws,
                  void (*cb)(struct evws_message *, void *), void *arg);
 
+void evws_set_open_cb(struct evws *ws,
+                      void (*cb)(struct evws_connection *, void *), void *arg);
+
 void evws_set_error_cb(struct evws *ws,
                        void (*cb)(struct evws_connection *, void *), void *arg);
 

@@ -58,14 +58,19 @@ void ws_callback(struct evws_message *msg, void *user)
   free(data);
 }
 
+void ws_open(struct evws_connection *conn, void *user)
+{
+  ws_print(conn, "ws open!", 8);
+}
+
 void ws_error(struct evws_connection *conn, void *user)
 {
-  ws_print(conn, "ws error!", 10);
+  ws_print(conn, "ws error!", 9);
 }
 
 void ws_close(struct evws_connection* conn, void* user)
 {
-  ws_print(conn, "ws close!", 10);
+  ws_print(conn, "ws close!", 9);
 }
 
 int main(int argc, char *argv[])
@@ -111,6 +116,7 @@ int main(int argc, char *argv[])
   }
 
   evws_set_cb(ws, ws_callback, NULL);
+  evws_set_open_cb(ws, ws_open, NULL);
   evws_set_error_cb(ws, ws_error, NULL);
   evws_set_close_cb(ws, ws_close, NULL);
 
