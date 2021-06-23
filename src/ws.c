@@ -294,10 +294,6 @@ void evws_connection_free(struct evws_connection *conn)
     conn->active = 0;
   }
 
-  if (conn->evws->closecb) {
-    conn->evws->closecb(conn, conn->evws->closecbarg);
-  }
-
   while ((message = TAILQ_FIRST(&conn->messages)) != NULL) {
     /* evws_message_free removes */
     evws_message_free(message);
@@ -305,6 +301,7 @@ void evws_connection_free(struct evws_connection *conn)
 
   TAILQ_REMOVE(&conn->evws->connections, conn, next);
 
+  wslay_event_context_free(conn->wslay);
   bufferevent_free(conn->buffer);
   free(conn->address);
   free(conn);
@@ -359,6 +356,9 @@ void evws_connection_event_cb_(struct bufferevent *bev, short events,
       ws->evws->errorcb(ws, ws->evws->errorcbarg);
     }
   }
+
+  /* dispose the connection now that callbacks have completed */
+  evws_connection_free(ws);
 }
 
 void evws_close_(struct bufferevent *bev, void *user)
