@@ -5,9 +5,9 @@ list (APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 
 include (CheckIncludeFile)
 
-find_package(LibEvent REQUIRED)
-find_package(Wslay REQUIRED)
-find_package(OpenSSL REQUIRED)
+find_package (LibEvent REQUIRED)
+find_package (Wslay REQUIRED)
+find_package (OpenSSL REQUIRED)
 
 CHECK_INCLUDE_FILE (sys/queue.h HAVE_SYS_QUEUE)
 configure_file (src/queue-compat.h.in queue-compat.h)
