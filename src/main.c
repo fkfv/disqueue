@@ -72,6 +72,8 @@ int main(int argc, char *argv[])
     return 1;
   }
 
+  manager_shutdown();
+
 #ifdef _WIN32
   WSACleanup();
 #endif
