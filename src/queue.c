@@ -103,12 +103,11 @@ int queue_put(struct queue *q, const char *key, const char *value)
 
   /* check if we can immediately consume the item */
   if (q->callback_count > 0) {
-    if ((!key && q->keyed_callback_count != q->callback_count) ||
-        (key && q->keyed_callback_count > 0)) {
+    if ((!key && q->keyed_callback_count != q->callback_count) || key) {
       TAILQ_FOREACH(callback, &q->callbacks, next) {
         /* check if we want all items in the callback, or if the callback key
            matches the item key */
-        if (!key || (callback->key && !strcasecmp(callback->key, key))) {
+        if (!callback->key || (key && !strcasecmp(callback->key, key))) {
           /* take the callback out as soon as possible. */
           cb = callback->addcb;
           cbarg = callback->addcbarg;
