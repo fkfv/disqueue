@@ -38,9 +38,14 @@ void manager_queue_info_cb_(struct evhttp_request *request, void *user);
 void manager_queue_delete_cb_(struct evhttp_request *request, void *user);
 
 void manager_take_item_cb_(struct evhttp_request *request, void *user);
+
+void manager_peek_cb_(struct evhttp_request *request, void *user);
 void manager_peek_item_cb_(struct evhttp_request *request, void *user);
+void manager_peek_done_cb_(struct evhttp_request *request, void *user);
+
 void manager_wait_item_cb_(struct evws_message *message, void *user);
 void manager_wait_close_cb_(struct evws_connection *connection, void *user);
+
 void manager_put_item_cb_(struct evhttp_request *request, void *user);
 
 /* queue callbacks */
@@ -69,6 +74,12 @@ struct manager_queue_want {
   /* an identifier so the client can identify this response */
   char *identifier;
 
+  /* if the want is cancelled */
+  int cancelled;
+
+  /* the queue a want is waiting on */
+  struct manager_queue *queue;
+
   /* websocket connection to the client */
   struct evws_connection *client;
 };
@@ -91,7 +102,8 @@ void manager_queue_free_(struct manager_queue *queue);
 
 /* create/free want events */
 struct manager_queue_want *manager_queue_want_new_(const char *id,
-                                                   struct evws_connection *con);
+                                                   struct evws_connection *con,
+                                                   struct manager_queue *queue);
 void manager_queue_want_free_(struct manager_queue_want *want);
 
 /* the global context instance */
