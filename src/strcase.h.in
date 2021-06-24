@@ -1,0 +1,21 @@
+#cmakedefine HAVE_STRINGS_H
+#cmakedefine HAVE_STRCASECMP
+#cmakedefine HAVE__STRICMP
+#cmakedefine HAVE_STRICMP
+
+#ifdef HAVE_STRINGS_H
+#include <strings.h>
+#endif
+#include <string.h>
+
+#ifndef HAVE_STRCASECMP
+  #ifdef HAVE__STRICMP
+    #define strcasecmp _stricmp
+    #define strncasecmp _strnicmp
+  #elif defined(HAVE_STRICMP)
+    #define strcasecmp stricmp
+    #define strncasecmp _strnicmp
+  #else
+    #error "stricmp/_stricmp/strcasecmp not found"
+  #endif
+#endif

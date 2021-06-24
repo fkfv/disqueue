@@ -1,0 +1,10 @@
+#cmakedefine HAVE_ARPA_INET_H
+#cmakedefine HAVE_WINSOCK2_H
+
+#ifdef HAVE_ARPA_INET_H
+  #include <arpa/inet.h>
+#elif defined(HAVE_WINSOCK2_H)
+  #include <winsock2.h>
+#else
+  #error "don't know where to find htonl/htons"
+#endif

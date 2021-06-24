@@ -31,7 +31,8 @@ struct queue_item;
 struct queue *queue_new(const unsigned char id[16]);
 void queue_free(struct queue *q);
 
-/* put an item in the queue */
+/* put an item in the queue. returns -1 on failure, 0 if the item was added to
+   the queue and 1 if the item was immediately consumed */
 int queue_put(struct queue *q, const char *key, const char *value);
 
 /* take an item from the queue. if the item does not exist, this function will
@@ -46,19 +47,21 @@ struct queue_item *queue_take(struct queue *q, const char *key);
 struct queue_item *queue_peek(struct queue *q, const char *key);
 
 /* wait for an item to become available in the queue, and then invoke the
-   callback. the context argument will be provided to the callback */
+   callback. the context argument will be provided to the callback. returns -1
+   on failure, 0 if the item is not yet present and 1 if the callback was
+   immediately triggered */
 int queue_wait(struct queue *q, const char *key,
                void(*cb)(struct queue_item *, void *), void *arg);
 
 /* get the uuid of a queue as a printable string */
-void queue_get_uuid(char uuid[QUEUE_UUID_STR_LEN + 1/*NULL*/]);
+void queue_get_uuid(struct queue *q, char uuid[QUEUE_UUID_STR_LEN + 1/*NULL*/]);
 
 /* get the key and value of the item. this is only valid if:
      the item has been locked OR
      the item has been taken OR
      the callback the item was given to has not returned */
-char *queue_item_get_key(struct queue_item *item);
-char *queue_item_get_value(struct queue_item *item);
+const char *queue_item_get_key(struct queue_item *item);
+const char *queue_item_get_value(struct queue_item *item);
 
 /* lock a queue item. this should only be used on items found using queue_peek,
    queue_take does not need to do this as the item is always available if it
