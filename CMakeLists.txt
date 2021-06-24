@@ -9,6 +9,7 @@ include (CheckFunctionExists)
 find_package (LibEvent REQUIRED)
 find_package (Wslay REQUIRED)
 find_package (OpenSSL REQUIRED)
+find_package (JsonC REQUIRED)
 
 CHECK_INCLUDE_FILE (sys/queue.h HAVE_SYS_QUEUE)
 CHECK_INCLUDE_FILE (strings.h HAVE_STRINGS_H)
@@ -26,6 +27,7 @@ add_executable (disqueue
   src/main.c
   src/queue.c
   src/ws.c
+  src/manager.c
   )
 
 if (WIN32)
@@ -39,8 +41,10 @@ target_include_directories (disqueue PUBLIC
   ${LIBEVENT_INCLUDE_DIR}
   ${WSLAY_INCLUDE_DIR}
   ${OPENSSL_INCLUDE_DIR}
+  ${JSONC_INCLUDE_DIR}
   "${PROJECT_BINARY_DIR}")
 target_link_libraries (disqueue
   ${LIBEVENT_LIB}
   ${WSLAY_LIB}
-  ${OPENSSL_LIBRARIES})
+  ${OPENSSL_LIBRARIES}
+  ${JSONC_LIB})

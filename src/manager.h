@@ -20,61 +20,8 @@
   THE SOFTWARE.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <event2/event.h>
 #include <event2/http.h>
-
 #include "ws.h"
-#include "manager.h"
 
-int main(int argc, char *argv[])
-{
-  struct event_base *base;
-  struct evhttp *http;
-  struct evws *ws;
-#ifdef _WIN32
-  WSADATA wsa;
-
-  WSAStartup(MAKEWORD(2, 2), &wsa);
-#endif
-
-  base = event_base_new();
-  if (!base) {
-    return 1;
-  }
-
-  http = evhttp_new(base);
-  if (!http) {
-    event_base_free(base);
-    return 1;
-  }
-
-  if (evhttp_bind_socket(http, "0.0.0.0", 3682) != 0) {
-    evhttp_free(http);
-    event_base_free(base);
-    return 1;
-  }
-
-  ws = evws_new(http);
-  if (!ws) {
-    evhttp_free(http);
-    event_base_free(base);
-    return 1;
-  }
-
-  manager_startup(http, ws);
-
-  if (event_base_dispatch(base) == -1) {
-    evhttp_free(http);
-    event_base_free(base);
-    return 1;
-  }
-
-#ifdef _WIN32
-  WSACleanup();
-#endif
-
-  return 0;
-}
+void manager_startup(struct evhttp *http, struct evws *ws);
+void manager_shutdown(void);
