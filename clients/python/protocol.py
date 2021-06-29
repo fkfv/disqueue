@@ -1,5 +1,6 @@
 import json
 import typing
+from autobahn.asyncio.websocket import WebSocketClientProtocol
 
 
 class QueueException(Exception):
@@ -47,6 +48,24 @@ class ProtocolMessage:
         """Raise an exception if the message does not indicate success"""
         if not self.success:
             raise EXCEPTION_CLASS(self.message)
+
+
+class DisqueueWebSocketProtocol(WebSocketClientProtocol):
+    """
+    Autobahn WebSocket protocol
+    """
+
+    # The client that created the factory that created this protocol instance
+    # factory.client: Disqueue
+
+    def onMessage(self, payload, isBinary):
+        payload = payload.decode('utf-8')
+        message = parse(payload)
+
+        self.factory.client.notify_message(message, self.sendMessage)
+
+    def onOpen(self):
+        self.factory.client.notify_open(self.sendMessage)
 
 
 def parse(data: str) -> ProtocolMessage:
