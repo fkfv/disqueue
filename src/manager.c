@@ -31,28 +31,106 @@
 #include "manager-internal.h"
 #include "hostnet.h"
 #include "strcase.h"
+#include "protocol.h"
 
 struct manager_context manager_context_;
 
-struct json_object *wrap_json_object(struct json_object *json, const char *name)
+void manager_send_http(struct evhttp_request* request, int code, const char* message, size_t len)
 {
-  struct json_object *wrapper;
+  struct evbuffer* outbuffer;
+  struct evkeyvalq *headers;
 
-  wrapper = json_object_new_object();
+  if (len == 0) {
+    len = strlen(message);
+  }
+
+  headers = evhttp_request_get_output_headers(request);
+  evhttp_add_header(headers, "Content-Type", "application/json");
+
+  outbuffer = evhttp_request_get_output_buffer(request);
+  evbuffer_add(outbuffer, message, len);
+  evhttp_send_reply(request, code, NULL, NULL);
+}
+
+void manager_send_json(struct evhttp_request* request, int code, struct json_object* json)
+{
+  const char *encoded;
+  size_t encoded_length;
+
+  encoded = json_object_to_json_string_length(json, JSON_C_TO_STRING_PLAIN,
+                                              &encoded_length);
+  if (!encoded) {
+    manager_send_http(request, HTTP_INTERNAL, protocol_failure_fallback(), 0);
+    return;
+  }
+
+  manager_send_http(request, code, encoded, encoded_length);
+  json_object_put(json);
+}
+
+void manager_send_http_error(struct evhttp_request *request, int code, const char *error)
+{
+  struct json_object *err;
+
+  if (code == 0) {
+    code = HTTP_INTERNAL;
+  }
+
+  err = protocol_create_failure(error);
+  if (!err) {
+    manager_send_http(request, HTTP_INTERNAL, protocol_failure_fallback(), 0);
+    return;
+  }
+
+  manager_send_json(request, code, err);
+}
+
+void manager_ws_send(struct evws_connection* conn, struct json_object* obj)
+{
+  const char* encoded;
+
+  encoded = json_object_to_json_string_ext(obj, 0/*PLAIN*/);
+  if (encoded) {
+    evws_connection_send(conn, encoded);
+  } else {
+    evws_connection_send(conn, protocol_failure_fallback());
+  }
+
+  json_object_put(obj);
+}
+
+void manager_send_ws_error(struct evws_connection* connection,
+                           const char* error)
+{
+  struct json_object* err;
+
+  err = protocol_create_failure(error);
+  if (!err) {
+    evws_connection_send(connection, protocol_failure_fallback());
+    return;
+  }
+
+  manager_ws_send(connection, err);
+}
+
+void manager_ws_error(struct manager_queue_want *want)
+{
+  manager_send_ws_error(want->client, "failed to get item");
+}
+
+void manager_send_payload_http(struct evhttp_request* request,
+                               struct json_object* obj)
+{
+  struct json_object* wrapper;
+
+  wrapper = protocol_create_success(obj);
   if (!wrapper) {
-    json_object_put(json);
-    return NULL;
+    json_object_put(obj);
+    manager_send_http_error(request, 0, "failed to create payload");
+    return;
   }
 
-  if (json_object_object_add_ex(wrapper, name, json,
-                                JSON_C_OBJECT_ADD_KEY_IS_NEW |
-                                JSON_C_OBJECT_KEY_IS_CONSTANT) != 0) {
-    json_object_put(json);
-    json_object_put(wrapper);
-    return NULL;
-  }
-
-  return wrapper;
+  manager_send_json(request, HTTP_OK, wrapper);
 }
 
 int manager_read_post(struct evhttp_request *request, struct evkeyvalq *params)
@@ -65,70 +143,46 @@ int manager_read_post(struct evhttp_request *request, struct evkeyvalq *params)
   bodylength = evbuffer_get_length(inbuffer);
   body = calloc(1, bodylength + 1/*NULL*/);
   if (!body) {
-    manager_internal_error_(request);
-    return 0;
+    goto error;
   }
 
   if (evbuffer_copyout(inbuffer, body, bodylength) != bodylength) {
-    free(body);
-    manager_internal_error_(request);
-    return 0;
+    goto error;
   }
 
   if (evhttp_parse_query_str(body, params) != 0) {
-    free(body);
-    manager_internal_error_(request);
-    return 0;
+    goto error;
   }
 
   free(body);
   return 1;
-}
 
-void manager_send_json(struct evhttp_request *request, const char *name,
-                       struct json_object *json)
-{
-  struct evbuffer *outbuffer;
-  const char *encoded_list;
-  size_t encoded_length;
-
-  json = wrap_json_object(json, name);
-  if (!json) {
-    manager_internal_error_(request);
-    return;
+error:
+  if (body) {
+    free(body);
   }
 
-  outbuffer = evhttp_request_get_output_buffer(request);
-  encoded_list = json_object_to_json_string_length(json, 0/*PLAIN*/,
-                                                   &encoded_length);
-  if (!encoded_list || evbuffer_add(outbuffer, encoded_list, encoded_length)) {
-    json_object_put(json);
-    manager_internal_error_(request);
-    return;
-  }
-
-  json_object_put(json);
-  evhttp_send_reply(request, HTTP_OK, NULL, NULL);
+  manager_send_http_error(request, 0, "failed to read post body");
+  return 0;
 }
 
 struct json_object *manager_encode_item(struct queue_item *item)
 {
-  struct json_object *base;
-  struct json_object *key;
-  struct json_object *value;
+  struct json_object *base = NULL;
+  struct json_object *key = NULL;
+  struct json_object *value = NULL;
   const char *item_key;
 
   base = json_object_new_object();
   if (!base) {
-    return NULL;
+    goto error;
   }
 
   item_key = queue_item_get_key(item);
   if (item_key) {
     key = json_object_new_string(item_key);
     if (!key) {
-      json_object_put(base);
-      return NULL;
+      goto error;
     }
   } else {
     key = NULL;
@@ -136,27 +190,32 @@ struct json_object *manager_encode_item(struct queue_item *item)
 
   if (json_object_object_add_ex(base, "key", key,
                                 JSON_C_OBJECT_ADD_KEY_IS_NEW) != 0) {
-      if (key) {
-        json_object_put(key);
-      }
-      json_object_put(base);
-      return NULL;
+      goto error;
   }
+  key = NULL;
 
   value = json_object_new_string(queue_item_get_value(item));
-  if (!value) {
-    json_object_put(base);
-    return NULL;
-  }
-
-  if (json_object_object_add_ex(base, "value", value,
-                                JSON_C_OBJECT_ADD_KEY_IS_NEW) != 0) {
-    json_object_put(value);
-    json_object_put(base);
-    return NULL;
+  if (!value || json_object_object_add_ex(base, "value", value,
+                                          JSON_C_OBJECT_ADD_KEY_IS_NEW) != 0) {
+    goto error;
   }
 
   return base;
+
+error:
+  if (base) {
+    json_object_put(base);
+  }
+
+  if (value) {
+    json_object_put(value);
+  }
+
+  if (key) {
+    json_object_put(key);
+  }
+
+  return NULL;
 }
 
 struct json_object *manager_parse_ws(struct evws_message *message)
@@ -164,65 +223,23 @@ struct json_object *manager_parse_ws(struct evws_message *message)
   struct evbuffer *inbuffer;
   char *body;
   size_t bodylength;
-  struct json_object *obj;
+  struct json_object *obj = NULL;
 
   inbuffer = evws_message_get_buffer(message);
   bodylength = evbuffer_get_length(inbuffer);
   body = calloc(1, bodylength + 1/*NULL*/);
-  if (!body) {
-    return NULL;
-  }
-
-  if (evbuffer_copyout(inbuffer, body, bodylength) != bodylength) {
-    free(body);
-    return NULL;
+  if (!body || evbuffer_copyout(inbuffer, body, bodylength) != bodylength) {
+    goto done;
   }
 
   obj = json_tokener_parse(body);
-  free(body);
+
+done:
+  if (body) {
+    free(body);
+  }
+  
   return obj;
-}
-
-void manager_ws_send(struct evws_connection *conn, struct json_object *obj)
-{
-  const char *encoded;
-
-  encoded = json_object_to_json_string_ext(obj, 0/*PLAIN*/);
-  if (encoded) {
-    evws_connection_send(conn, encoded);
-  }
-
-  json_object_put(obj);
-}
-
-void manager_ws_error(struct manager_queue_want *want)
-{
-  struct json_object *obj;
-  struct json_object *success;
-
-  obj = json_object_new_object();
-  if (!obj) {
-    goto error_fallback;
-  }
-
-  success = json_object_new_boolean(0);
-  if (!success) {
-    json_object_put(obj);
-    goto error_fallback;
-  }
-
-  if (json_object_object_add_ex(obj, "success", success,
-                                JSON_C_OBJECT_ADD_KEY_IS_NEW) != 0) {
-    json_object_put(success);
-    json_object_put(obj);
-    goto error_fallback;
-  }
-
-  manager_ws_send(want->client, obj);
-
-error_fallback:
-  /* fallback since json encode failed - send NULL */
-  evws_connection_send(want->client, "NULL");
 }
 
 void manager_startup(struct evhttp *http, struct evws *ws)
@@ -260,16 +277,6 @@ void manager_shutdown(void)
   /* remove queues */
 }
 
-void manager_bad_request_cb_(struct evhttp_request *request, void *user)
-{
-  evhttp_send_error(request, HTTP_BADREQUEST, NULL);
-}
-
-void manager_internal_error_(struct evhttp_request *request)
-{
-  evhttp_send_error(request, HTTP_INTERNAL, NULL);
-}
-
 void manager_queues_cb_(struct evhttp_request *request, void *user)
 {
   switch (evhttp_request_get_command(request)) {
@@ -280,7 +287,7 @@ void manager_queues_cb_(struct evhttp_request *request, void *user)
     manager_queues_new_cb_(request, user);
     break;
   default:
-    manager_bad_request_cb_(request, user);
+    manager_send_http_error(request, HTTP_BADMETHOD, "method not supported");
     break;
   }
 }
@@ -288,57 +295,64 @@ void manager_queues_cb_(struct evhttp_request *request, void *user)
 void manager_queues_list_cb_(struct evhttp_request *request, void *user)
 {
   struct manager_queue *q;
-  struct json_object *queue_list;
-  struct json_object *stringobject;
+  struct json_object *queue_list = NULL;
+  struct json_object *stringobject = NULL;
 
   queue_list = json_object_new_array();
   if (!queue_list) {
-    manager_internal_error_(request);
-    return;
+    goto error;
   }
 
   TAILQ_FOREACH(q, &manager_context_.queues, next) {
     stringobject = json_object_new_string(q->id);
-    if (!stringobject) {
-      json_object_put(queue_list);
-      manager_internal_error_(request);
-    }
-
-    if (json_object_array_add(queue_list, stringobject) != 0) {
-      json_object_put(stringobject);
-      json_object_put(queue_list);
-      manager_internal_error_(request);
+    if (!stringobject || json_object_array_add(queue_list, stringobject) != 0) {
+      goto error;
     }
   }
 
-  manager_send_json(request, "queues", queue_list);
+  manager_send_payload_http(request, queue_list);
+  return;
+
+error:
+  if (stringobject) {
+    json_object_put(stringobject);
+  }
+
+  if (queue_list) {
+    json_object_put(queue_list);
+  }
+
+  manager_send_http_error(request, 0, "failed to list queues");
 }
 
 void manager_queues_new_cb_(struct evhttp_request *request, void *user)
 {
   struct evkeyvalq params = {0};
-  struct manager_queue *q;
+  struct manager_queue *q = NULL;
   struct json_object *name;
 
-  if (manager_read_post(request, &params) != 1) {
-    manager_internal_error_(request);
-    return;
+  if (manager_read_post(request, &params) != 1 ||
+      manager_validate_(request, &q, 1, &params) != 1) {
+    goto error;
   }
-
-  if (manager_validate_(request, &q, 1, &params) != 1) {
-    evhttp_clear_headers(&params);
-    return;
-  }
-  evhttp_clear_headers(&params);
 
   name = json_object_new_string(q->id);
   if (!name) {
-    manager_queue_free_(q);
-    manager_internal_error_(request);
-    return;
+    goto error;
   }
 
-  manager_send_json(request, "queue_name", name);
+  evhttp_clear_headers(&params);
+  manager_send_payload_http(request, name);
+  return;
+
+error:
+  evhttp_clear_headers(&params);
+
+  if (q) {
+    manager_queue_free_(q);
+  }
+
+  manager_send_http_error(request, 0, "failed to create queue");
 }
 
 void manager_queue_cb_(struct evhttp_request *request, void *user)
@@ -351,7 +365,7 @@ void manager_queue_cb_(struct evhttp_request *request, void *user)
     manager_queue_delete_cb_(request, user);
     break;
   default:
-    manager_bad_request_cb_(request, user);
+    manager_send_http_error(request, HTTP_BADMETHOD, "method not supported");
     break;
   }
 }
@@ -360,43 +374,46 @@ void manager_queue_info_cb_(struct evhttp_request *request, void *user)
 {
   struct evkeyvalq params = {0};
   struct manager_queue *q;
-  struct json_object *info;
-  struct json_object *name;
+  struct json_object *info = NULL;
+  struct json_object *name = NULL;
 
-  if (manager_read_post(request, &params) != 1) {
-    manager_internal_error_(request);
-    return;
+  if (manager_read_post(request, &params) != 1 ||
+      manager_validate_(request, &q, 0, &params) != 1) {
+    goto error;
   }
-
-  if (manager_validate_(request, &q, 0, &params) != 1) {
-    evhttp_clear_headers(&params);
-    return;
-  }
-  evhttp_clear_headers(&params);
 
   info = json_object_new_object();
   if (!info) {
-    manager_internal_error_(request);
-    return;
+    goto error;
   }
 
   name = json_object_new_string(q->id);
   if (!name) {
-    json_object_put(info);
-    manager_internal_error_(request);
-    return;
+    goto error;
   }
 
   if (json_object_object_add_ex(info, "name", name,
                                 JSON_C_OBJECT_ADD_KEY_IS_NEW |
                                 JSON_C_OBJECT_KEY_IS_CONSTANT) != 0) {
-    json_object_put(name);
-    json_object_put(info);
-    manager_internal_error_(request);
-    return;
+    goto error;
   }
 
-  manager_send_json(request, "queue", info);
+  evhttp_clear_headers(&params);
+  manager_send_payload_http(request, info);
+  return;
+
+error:
+  evhttp_clear_headers(&params);
+
+  if (info) {
+    json_object_put(info);
+  }
+
+  if (name) {
+    json_object_put(name);
+  }
+
+  manager_send_http_error(request, 0, "failed to get queue info");
 }
 
 void manager_queue_delete_cb_(struct evhttp_request *request, void *user)
@@ -407,16 +424,15 @@ void manager_queue_delete_cb_(struct evhttp_request *request, void *user)
   struct manager_queue_want *next;
   struct json_object *status;
 
-  if (manager_read_post(request, &params) != 1) {
-    manager_internal_error_(request);
-    return;
+  if (manager_read_post(request, &params) != 1 ||
+      manager_validate_(request, &q, 0, &params) != 1) {
+    goto error;
   }
 
-  if (manager_validate_(request, &q, 0, &params) != 1) {
-    evhttp_clear_headers(&params);
-    return;
+  status = json_object_new_boolean(1);
+  if (!status) {
+    goto error;
   }
-  evhttp_clear_headers(&params);
 
   /* remove the queue */
   manager_queue_free_(q);
@@ -433,51 +449,55 @@ void manager_queue_delete_cb_(struct evhttp_request *request, void *user)
     want = next;
   }
 
-  status = json_object_new_boolean(1);
-  if (!status) {
-    manager_queue_free_(q);
-    manager_internal_error_(request);
-    return;
-  }
+  evhttp_clear_headers(&params);
+  manager_send_payload_http(request, status);
+  return;
 
-  manager_send_json(request, "delete", status);
+error:
+  evhttp_clear_headers(&params);
+
+  manager_send_http_error(request, 0, "failed to delete queue");
 }
 
 void manager_take_item_cb_(struct evhttp_request *request, void *user)
 {
   struct evkeyvalq params = {0};
-  struct queue_item *item;
+  struct queue_item *item = NULL;
   struct manager_queue *q;
   struct json_object *encoded;
   const char *key;
 
-  if (manager_read_post(request, &params) != 1) {
-    manager_internal_error_(request);
-    return;
-  }
-
-  if (manager_validate_(request, &q, 0, &params) != 1) {
-    evhttp_clear_headers(&params);
-    return;
+  if (manager_read_post(request, &params) != 1 ||
+      manager_validate_(request, &q, 0, &params) != 1) {
+    goto error;
   }
 
   key = evhttp_find_header(&params, "key");
   item = queue_take(q->q, key);
   if (!item) {
     evhttp_clear_headers(&params);
-    manager_internal_error_(request);
+    manager_send_payload_http(request, NULL);
     return;
   }
-  evhttp_clear_headers(&params);
 
   encoded = manager_encode_item(item);
   if (!encoded) {
-    queue_item_free(item);
-    manager_internal_error_(request);
-    return;
+    goto error;
   }
 
-  manager_send_json(request, "item", encoded);
+  queue_item_free(item);
+  evhttp_clear_headers(request);
+  manager_send_payload_http(request, encoded);
+  return;
+
+error:
+  evhttp_clear_headers(&params);
+
+  if (item) {
+    queue_item_free(item);
+  }
+
+  manager_send_http_error(request, 0, "failed to take item");
 }
 
 void manager_peek_item_cb_(struct evhttp_request *request, void *user)
@@ -486,39 +506,44 @@ void manager_peek_item_cb_(struct evhttp_request *request, void *user)
   struct queue_item *item;
   struct manager_queue *q;
   struct json_object *encoded;
+  int locked = 0;
   const char *key;
 
-  if (manager_read_post(request, &params) != 1) {
-    manager_internal_error_(request);
-    return;
-  }
-
-  if (manager_validate_(request, &q, 0, &params) != 1) {
-    evhttp_clear_headers(&params);
-    return;
+  if (manager_read_post(request, &params) != 1 ||
+      manager_validate_(request, &q, 0, &params) != 1) {
+    goto error;
   }
 
   key = evhttp_find_header(&params, "key");
   item = queue_peek(q->q, key);
   if (!item) {
     evhttp_clear_headers(&params);
-    manager_internal_error_(request);
+    manager_send_payload_http(request, NULL);
     return;
   }
   queue_item_lock(item);
-  evhttp_clear_headers(&params);
+  locked = 1;
 
   encoded = manager_encode_item(item);
   if (!encoded) {
-    queue_item_unlock(item);
-    manager_internal_error_(request);
-    return;
+    goto error;
   }
 
   queue_item_unlock(item);
-  manager_send_json(request, "item", encoded);
+  manager_send_payload_http(request, encoded);
+  return;
+
+error:
+  evhttp_clear_headers(&params);
+
+  if (locked) {
+    queue_item_unlock(item);
+  }
+
+  manager_send_http_error(request, 0, "failed to peek item");
 }
 
+/* TODO: rework */
 void manager_wait_item_cb_(struct evws_message *message, void *user)
 {
   json_object *request;
@@ -601,32 +626,30 @@ void manager_put_item_cb_(struct evhttp_request *request, void *user)
   const char *key;
   const char *value;
 
-  if (manager_read_post(request, &params) != 1) {
-    manager_internal_error_(request);
-    return;
+  if (manager_read_post(request, &params) != 1 || 
+      manager_validate_(request, &q, 0, &params) != 1) {
+    goto error;
   }
 
-  if (manager_validate_(request, &q, 0, &params) != 1) {
-    evhttp_clear_headers(&params);
-    return;
+  status = json_object_new_boolean(1);
+  if (!status) {
+    goto error;
   }
 
   key = evhttp_find_header(&params, "key");
   value = evhttp_find_header(&params, "value");
   if (queue_put(q->q, key, value) < 0) {
-    evhttp_clear_headers(&params);
-    manager_internal_error_(request);
-    return;
+    goto error;
   }
+
+  evhttp_clear_headers(&params);
+  manager_send_payload_http(request, status);
+  return;
+
+error:
   evhttp_clear_headers(&params);
 
-  status = json_object_new_boolean(1);
-  if (!status) {
-    manager_internal_error_(request);
-    return;
-  }
-
-  manager_send_json(request, "put", status);
+  manager_send_http_error(request, 0, "failed to put item");
 }
 
 void manager_wait_receive_cb_(struct queue_item *item, void *user)
@@ -692,13 +715,13 @@ int manager_validate_(struct evhttp_request *request,
 
   /* verify the name - it must be a uuid */
   if (name && strlen(name) != QUEUE_UUID_STR_LEN) {
-    manager_internal_error_(request);
+    manager_send_http_error(request, HTTP_BADREQUEST, "invalid queue id");
     return 0;
   }
 
   *q = manager_get_queue_(name, create_new);
   if (!*q) {
-    manager_internal_error_(request);
+    manager_send_http_error(request, HTTP_NOTFOUND, "queue does not exist");
     return 0;
   }
 

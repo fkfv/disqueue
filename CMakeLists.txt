@@ -28,6 +28,7 @@ add_executable (disqueue
   src/queue.c
   src/ws.c
   src/manager.c
+  src/protocol.c
   )
 
 if (WIN32)
