@@ -118,6 +118,21 @@ void manager_ws_error(struct manager_queue_want *want)
   manager_send_ws_error(want->client, "failed to get item");
 }
 
+void manager_send_ws_payload(struct evws_connection* connection,
+                             struct json_object* obj)
+{
+  struct json_object* wrapper;
+
+  wrapper = protocol_create_success(obj);
+  if (!wrapper) {
+    json_object_put(obj);
+    manager_send_ws_error(connection, "failed to create payload");
+    return;
+  }
+
+  manager_ws_send(connection, wrapper);
+}
+
 void manager_send_payload_http(struct evhttp_request* request,
                                struct json_object* obj)
 {
@@ -701,7 +716,7 @@ void manager_wait_receive_cb_(struct queue_item *item, void *user)
     return;
   }
 
-  manager_ws_send(want->client, response);
+  manager_send_ws_payload(want->client, response);
 }
 
 int manager_validate_(struct evhttp_request *request,
