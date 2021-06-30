@@ -1,0 +1,13 @@
+LICENSE
+README.md
+pyproject.toml
+setup.cfg
+setup.py
+src/disqueue/__init__.py
+src/disqueue/client.py
+src/disqueue/disqueue.py
+src/disqueue/protocol.py
+src/disqueue.egg-info/PKG-INFO
+src/disqueue.egg-info/SOURCES.txt
+src/disqueue.egg-info/dependency_links.txt
+src/disqueue.egg-info/top_level.txt

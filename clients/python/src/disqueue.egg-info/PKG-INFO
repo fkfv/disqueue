@@ -1,0 +1,49 @@
+Metadata-Version: 2.1
+Name: disqueue
+Version: 0.0.1
+Summary: Disqueue Python client
+Home-page: https://github.com/fkfv/disqueue
+Author: fkfv
+Author-email: 20618646+fkfv@users.noreply.github.com
+License: UNKNOWN
+Project-URL: Bug Tracker, https://github.com/fkfv/disqueue/issues
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.4
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# Disqueue
+> Disqueue Python client
+
+## Requirements
+* Python >= 3.4 (for asyncio)
+* autobahn (MIT License)
+* requests (Apache License 2.0)
+
+Requirements can be installed using pip: `pip install -r requirements.txt`
+
+## License
+Disqueue is licensed under the MIT license. The full license text is available
+in the LICENSE file.
+
+## Example
+```python
+from disqueue import Disqueue
+
+
+# Create the client - 127.0.0.1 instead of localhost because Python is slow to
+# resolve localhost.
+client = Disqueue('http://127.0.0.1:3682')
+
+@client.queue_handler('queue-id', key=None)
+def queue_handler(key: typing.Optional[str], value: str):
+    pass
+
+
+client.run()
+```
+
+
