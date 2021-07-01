@@ -26,10 +26,12 @@
 #include <event2/event.h>
 #include <event2/http.h>
 
+#include "config.h"
 #include "ws.h"
 #include "manager.h"
 
-int main(int argc, char *argv[])
+/* start and run libevent */
+int event_startup(const char *hostname, short port)
 {
   struct event_base *base;
   struct evhttp *http;
@@ -79,4 +81,19 @@ int main(int argc, char *argv[])
 #endif
 
   return 0;
+}
+
+int main(int argc, char *argv[])
+{
+  const char *hostname;
+  short port;
+
+  if (!config_load_defaults()) {
+    return 1;
+  }
+
+  hostname = config_get_string("/host");
+  port = config_get_short("/port");
+
+  return event_startup(hostname, port);
 }

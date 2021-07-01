@@ -31,6 +31,7 @@ add_executable (disqueue
   src/protocol.c
   src/connection-http.c
   src/connection-ws.c
+  src/config.c
   )
 
 if (WIN32)
