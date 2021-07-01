@@ -16,6 +16,12 @@ To instruct the build script on where to find these libraries, you can set
 `-DLIBEVENT_ROOT=/opt/libevent -DWSLAY_ROOT=/opt/wslay -DJSONC_ROOT=/opt/json-c`
 to specify the install prefix of the libraries.
 
+## Client
+Interacting with the Disqueue API is possible using regular HTTP/1.1 and
+WebSockets, see the [API.md](API.md) file. Using a prebuilt client will make
+using Disqueue much easier. Try one of the following:
+  * [clients/python](clients/python)
+
 ## Compatibility
 disqueue is tested on Microsoft Windows and Ubuntu Linux, however all operating
 systems supporting libevent and the standard C library should be able to run
