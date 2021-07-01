@@ -282,7 +282,7 @@ void queue_item_free(struct queue_item *item)
   queue_item_free_(item);
 }
 
-struct queue_item *queue_item_new_(char *key, char *value)
+struct queue_item *queue_item_new_(const char *key, const char *value)
 {
   struct queue_item *item;
 
@@ -322,7 +322,7 @@ void queue_item_free_(struct queue_item *item)
   free(item);
 }
 
-struct queue_callback *queue_callback_new_(char *key)
+struct queue_callback *queue_callback_new_(const char *key)
 {
   struct queue_callback *callback;
 

@@ -83,9 +83,9 @@ struct queue {
   TAILQ_HEAD(qchead, queue_callback) callbacks;
 };
 
-struct queue_item *queue_item_new_(char *key, char *value);
+struct queue_item *queue_item_new_(const char *key, const char *value);
 /* this free function will ignore the lock count and delete anyway */
 void queue_item_free_(struct queue_item *item);
 
-struct queue_callback *queue_callback_new_(char *key);
+struct queue_callback *queue_callback_new_(const char *key);
 void queue_callback_free_(struct queue_callback *cb);
