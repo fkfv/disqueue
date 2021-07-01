@@ -31,7 +31,6 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 
-
 #define REQ_VERSION_BEFORE(major, minor, major_v, minor_v)     \
   ((major) < (major_v) ||                                      \
       ((major) == (major_v) && (minor) < (minor_v)))
@@ -40,7 +39,7 @@
 
 const char security_key[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-const char *create_security_key(const char *key)
+char *create_security_key(const char *key)
 {
   BIO *mem;
   BIO *sha1;
@@ -55,8 +54,8 @@ const char *create_security_key(const char *key)
   sha1 = BIO_push(sha1, mem);
   BIO_set_md(sha1, EVP_sha1());
 
-  BIO_write(sha1, key, strlen(key));
-  BIO_write(sha1, security_key, strlen(security_key));
+  BIO_write(sha1, key, (int)strlen(key));
+  BIO_write(sha1, security_key, (int)strlen(security_key));
 
   rd = BIO_gets(sha1, digest, sizeof(digest));
   if (rd != SHA_HASH_SIZE) {
@@ -111,27 +110,37 @@ int header_contains(char *value, const char *look)
 void evws_upgrade_http_cb_(struct evhttp_request *req, void *user)
 {
   struct evkeyvalq *headers = evhttp_request_get_input_headers(req);
-  const char *upgrade_header;
-  const char *connection_header;
+  char *upgrade_header;
+  char *connection_header;
+  char *response_key;
   const char *version_header;
   const char *request_key;
-  const char *response_key;
   struct evws_connection *connection;
   struct evws *ws = (struct evws *)user;
   char major;
   char minor;
 
   /* do not handle if this is not an upgrade request */
-  upgrade_header = evhttp_find_header(headers, "Upgrade");
-  connection_header = evhttp_find_header(headers, "Connection");
+  upgrade_header = strdup(evhttp_find_header(headers, "Upgrade"));
+  connection_header = strdup(evhttp_find_header(headers, "Connection"));
   if (!upgrade_header || !connection_header ||
       !header_contains(upgrade_header, "websocket") ||
       !header_contains(connection_header, "Upgrade")) {
+    if (upgrade_header) {
+      free(upgrade_header);
+    }
+
+    if (connection_header) {
+      free(connection_header);
+    }
+
     evhttp_send_error(req, HTTP_BADREQUEST, NULL);
     fprintf(stderr, "Upgrade: %s, Connection: %s\n", upgrade_header,
             connection_header);
     return;
   }
+  free(upgrade_header);
+  free(connection_header);
 
   /* request method MUST be GET and version MUST be >= 1.1 */
   evhttp_request_get_version(req, &major, &minor);
@@ -314,6 +323,11 @@ void evws_connection_get_peer(struct evws_connection *conn,
   *port = conn->port;
 }
 
+int evws_connection_is_active(struct evws_connection *conn)
+{
+  return conn->active;
+}
+
 void evws_message_free(struct evws_message *msg)
 {
   TAILQ_REMOVE(&msg->evcon->messages, msg, next);
@@ -443,9 +457,9 @@ ev_ssize_t evws_wslay_recv_callback_(wslay_event_context_ptr ctx,
   return read;
 }
 
-void evws_wslay_on_msg_recv_callback_(wslay_event_context_ptr ctx,
-                                      struct wslay_event_on_msg_recv_arg *arg,
-                                      void *user)
+void evws_wslay_on_msg_callback_(wslay_event_context_ptr ctx,
+                                 wslay_msg_arg arg,
+                                 void *user)
 {
   struct evws_connection *ws = (struct evws_connection *)user;
   struct evws_message *message;
@@ -497,7 +511,7 @@ struct evws_connection *evws_connection_new_(struct evhttp_connection *evcon)
   /* initialise wslay */
   ws->wslay_callbacks.recv_callback = evws_wslay_recv_callback_;
   ws->wslay_callbacks.send_callback = evws_wslay_send_callback_;
-  ws->wslay_callbacks.on_msg_recv_callback = evws_wslay_on_msg_recv_callback_;
+  ws->wslay_callbacks.on_msg_recv_callback = evws_wslay_on_msg_callback_;
   ws->wslay_last_error = wslay_event_context_server_init(&ws->wslay,
                                                          &ws->wslay_callbacks,
                                                          ws);
@@ -520,7 +534,7 @@ struct evws_connection *evws_connection_new_(struct evhttp_connection *evcon)
 }
 
 struct evws_message *evws_message_new_(struct evws_connection *conn,
-                                       struct wslay_event_on_msg_recv_arg *arg)
+                                       wslay_msg_arg arg)
 {
   struct evws_message *message;
 

@@ -99,7 +99,7 @@ void evws_connection_free(struct evws_connection *conn);
 void evws_connection_get_peer(struct evws_connection *conn,
                               char **address, ev_uint16_t *port);
 
-int evws_connection_get_last_error(struct evws_connection *conn);
+int evws_connection_is_active(struct evws_connection *conn);
 
 void evws_message_free(struct evws_message *msg);
 

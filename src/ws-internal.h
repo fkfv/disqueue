@@ -30,6 +30,8 @@
 struct evws_message;
 struct evws;
 
+typedef const struct wslay_event_on_msg_recv_arg *wslay_msg_arg;
+
 struct evws_connection {
   TAILQ_ENTRY(evws_connection) next;
 
@@ -111,4 +113,4 @@ void evws_connection_send_close_(struct evws_connection *conn);
 struct evws_connection *evws_connection_new_(struct evhttp_connection *evcon);
 
 struct evws_message *evws_message_new_(struct evws_connection *conn,
-                                       struct wslay_event_on_msg_recv_arg *arg);
+                                       wslay_msg_arg arg);
