@@ -29,6 +29,9 @@
 #include "config.h"
 #include "ws.h"
 #include "manager.h"
+#include "getopt.h"
+
+#define options "a:p:c:h"
 
 /* start and run libevent */
 int event_startup(const char *hostname, short port)
@@ -53,7 +56,7 @@ int event_startup(const char *hostname, short port)
     return 1;
   }
 
-  if (evhttp_bind_socket(http, "0.0.0.0", 3682) != 0) {
+  if (evhttp_bind_socket(http, hostname, port) != 0) {
     evhttp_free(http);
     event_base_free(base);
     return 1;
@@ -83,6 +86,81 @@ int event_startup(const char *hostname, short port)
   return 0;
 }
 
+void usage(const char *progname)
+{
+  printf("-- %s\n", progname);
+  printf("  -c [config file]: load configuration from file (default: none)\n");
+  printf("  -a [address]    : listen on address (default: 127.0.0.1)\n");
+  printf("  -p [port]       : listen on port (default: 3682)\n");
+  printf("  -h              : show help\n");
+}
+
+/* process command line arguments, return 1 if the arguments have been parsed
+   and the program should continue */
+int command_line(int argc, char *argv[])
+{
+  int c;
+  int show_help = 0;
+  const char *config_file = NULL;
+  const char *hostname = NULL;
+  const char *port = NULL;
+
+  while ((c = getopt(argc, argv, options)) != -1) {
+    switch (c) {
+    case 'c':
+      config_file = optarg;
+      break;
+    case 'a':
+      hostname = optarg;
+      break;
+    case 'p':
+      port = optarg;
+      break;
+    case 'h':
+      show_help = 1;
+      break;
+    case '?':
+      if (optopt == 'c' || optopt == 'a' || optopt == 'p') {
+        fprintf(stderr, "option -%c requres an argument\n", optopt);
+      } else if (isprint(optopt)) {
+        fprintf(stderr, "unknown option -%c\n", optopt);
+      } else {
+        fprintf(stderr, "invalid option\n");
+      }
+      show_help = 1;
+      break;
+    }
+  }
+
+  if (show_help) {
+    usage(argv[0]);
+    return 0;
+  }
+
+  if (config_file) {
+    if (!config_parse(config_file)) {
+      fprintf(stderr, "failed to load %s\n", config_file);
+      return 0;
+    }
+  }
+
+  if (hostname) {
+    if (!config_set_string("/host", hostname)) {
+      fprintf(stderr, "failed to set hostname\n");
+      return 0;
+    }
+  }
+
+  if (port) {
+    if (!config_set_short("/port", (short)atoi(port))) {
+      fprintf(stderr, "failed to set port\n");
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 int main(int argc, char *argv[])
 {
   const char *hostname;
@@ -90,6 +168,10 @@ int main(int argc, char *argv[])
 
   if (!config_load_defaults()) {
     return 1;
+  }
+
+  if (command_line(argc, argv) != 1) {
+    return 0;
   }
 
   hostname = config_get_string("/host");

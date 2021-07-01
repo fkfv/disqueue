@@ -9,9 +9,12 @@
 * wslay - wslay is used to provide websocket support -
     https://github.com/tatsuhiro-t/wslay
 
+* json-c - json-c is used to parse and generate JSON -
+    https://github.com/json-c/json-c
+
 To instruct the build script on where to find these libraries, you can set
-`-DLIBEVENT_ROOT=/opt/libevent -DWSLAY_ROOT=/opt/wslay` to specify the install
-prefix of the libraries.
+`-DLIBEVENT_ROOT=/opt/libevent -DWSLAY_ROOT=/opt/wslay -DJSONC_ROOT=/opt/json-c`
+to specify the install prefix of the libraries.
 
 ## Compatibility
 disqueue is tested on Microsoft Windows and Ubuntu Linux, however all operating
@@ -23,3 +26,8 @@ requirements are welcome.
 Disqueue is licensed under the MIT license. The full license text is available
 in the LICENSE file. Parts of the build script are under PHP/Zend license,
 details of this are in the LICENSE file.
+
+The following files are BSD Licensed and from the NetBSD project:
+  src/queue-compat.h.in
+  src/getopt.h.in
+  src/getopt.c
