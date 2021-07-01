@@ -18,10 +18,18 @@ CHECK_INCLUDE_FILE (winsock2.h HAVE_WINSOCK2_H)
 check_function_exists (strcasecmp HAVE_STRCASECMP)
 check_function_exists (_stricmp HAVE__STRICMP)
 check_function_exists (stricmp HAVE_STRICMP)
+check_function_exists (getopt HAVE_GETOPT)
 
 configure_file (src/queue-compat.h.in queue-compat.h)
 configure_file (src/strcase.h.in strcase.h)
 configure_file (src/hostnet.h.in hostnet.h)
+configure_file (src/getopt.h.in getopt.h)
+
+set (EXTRA_SOURCE "")
+
+if (NOT HAVE_GETOPT)
+  list (APPEND EXTRA_SOURCE src/getopt.c)
+endif ()
 
 add_executable (disqueue
   src/main.c
@@ -31,6 +39,8 @@ add_executable (disqueue
   src/protocol.c
   src/connection-http.c
   src/connection-ws.c
+  src/config.c
+  ${EXTRA_SOURCE}
   )
 
 if (WIN32)
