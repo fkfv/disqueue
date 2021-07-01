@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.10)
+cmake_minimum_required (VERSION 3.12)
 project (disqueue VERSION 0.0.1)
 
 list (APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
@@ -29,6 +29,8 @@ add_executable (disqueue
   src/ws.c
   src/manager.c
   src/protocol.c
+  src/connection-http.c
+  src/connection-ws.c
   )
 
 if (WIN32)
@@ -36,6 +38,11 @@ if (WIN32)
     ws2_32
     iphlpapi
     crypt32)
+
+  add_compile_definitions (
+    _CRT_NONSTDC_NO_WARNINGS
+    _CRT_SECURE_NO_WARNINGS
+    )
 endif ()
 
 target_include_directories (disqueue PUBLIC

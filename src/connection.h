@@ -22,46 +22,16 @@
 
 #include <event2/http.h>
 #include "ws.h"
-#include "queue-compat.h"
 #include "queue.h"
 
-struct manager_queue {
-  TAILQ_ENTRY(manager_queue) next;
+/* http callbacks */
+void connection_http_callback_queues(struct evhttp_request *request, void *);
+void connection_http_callback_queue(struct evhttp_request *request, void *);
+void connection_http_callback_take(struct evhttp_request *request, void *);
+void connection_http_callback_peek(struct evhttp_request *request, void *);
+void connection_http_callback_put(struct evhttp_request *request, void *);
 
-  /* queue being managed */
-  struct queue *q;
-
-  /* cached pretty print id of queue */
-  char id[QUEUE_UUID_STR_LEN + 1/*NULL*/];
-};
-
-/* details of a waiting event */
-struct manager_queue_want {
-  TAILQ_ENTRY(manager_queue_want) next;
-
-  /* an identifier so the client can identify this response */
-  char *identifier;
-
-  /* if the want is cancelled */
-  int cancelled;
-
-  /* the queue a want is waiting on */
-  struct manager_queue *queue;
-
-  /* websocket connection to the client */
-  struct evws_connection *client;
-};
-
-struct manager_context {
-  struct evhttp *http;
-  struct evws *ws;
-
-  /* queues being managed */
-  TAILQ_HEAD(mqhead, manager_queue) queues;
-
-  /* all queue items being waited on */
-  TAILQ_HEAD(mqwhead, manager_queue_want) wants;
-};
-
-/* the global context instance */
-extern struct manager_context manager_context_;
+/* websocket callbacks */
+void connection_ws_callback_wait(struct evws_message *message, void *);
+void connection_ws_callback_close(struct evws_connection *connection, void *);
+void connection_ws_callback_error(struct evws_connection *connection, void *);

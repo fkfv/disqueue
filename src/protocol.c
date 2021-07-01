@@ -102,3 +102,61 @@ const char *protocol_failure_fallback(void)
 {
   return "{\"success\": false, \"message\": \"cannot describe error\"}";
 }
+
+const char *protocol_failure_message(void)
+{
+  return "cannot describe error";
+}
+
+struct json_object *protocol_encode_item(struct queue_item *item)
+{
+  struct json_object *base = NULL;
+  struct json_object *key = NULL;
+  struct json_object *value = NULL;
+  const char *item_key;
+
+  base = json_object_new_object();
+  if (!base) {
+    goto error;
+  }
+
+  item_key = queue_item_get_key(item);
+  if (item_key) {
+    key = json_object_new_string(item_key);
+    if (!key) {
+      goto error;
+    }
+  } else {
+    key = NULL;
+  }
+
+  if (json_object_object_add_ex(base, "key", key,
+                                JSON_C_OBJECT_ADD_KEY_IS_NEW) != 0) {
+      goto error;
+  }
+  key = NULL;
+
+  value = json_object_new_string(queue_item_get_value(item));
+  if (!value || json_object_object_add_ex(base, "value", value,
+                                          JSON_C_OBJECT_ADD_KEY_IS_NEW) != 0) {
+    goto error;
+  }
+
+  return base;
+
+error:
+  if (base) {
+    json_object_put(base);
+  }
+
+  if (value) {
+    json_object_put(value);
+  }
+
+  if (key) {
+    json_object_put(key);
+  }
+
+  return NULL;
+}
+

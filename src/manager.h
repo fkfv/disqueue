@@ -22,6 +22,40 @@
 
 #include <event2/http.h>
 #include "ws.h"
+#include "queue.h"
+
+struct manager_queue;
+struct manager_queue_want;
 
 void manager_startup(struct evhttp *http, struct evws *ws);
 void manager_shutdown(void);
+
+struct manager_queue *manager_queue_get(const char name[QUEUE_UUID_STR_LEN],
+                                        int create_new);
+void manager_queue_free(struct manager_queue *queue);
+
+/* get the queue being managed. the returned queue MUST NOT be destroyed */
+struct queue *manager_queue_get_queue(struct manager_queue *queue);
+
+const char *manager_queue_get_id(struct manager_queue *queue);
+
+struct manager_queue_want *manager_queue_want_new(const char *id,
+                                                  struct evws_connection *con,
+                                                  struct manager_queue *queue);
+void manager_queue_want_free(struct manager_queue_want *want);
+
+/* iterate each queue, calling cb with the item. if one of the callbacks return
+   0 then iteration will be stopped and the function returns 0, otherwise it
+   returns 1 */
+int manager_queue_foreach(int(*cb)(struct manager_queue *, void *), void *arg);
+
+/* remove all wants for this queue */
+void manager_queue_want_remove(struct manager_queue *queue);
+
+/* remove all wants for a closed connection */
+void manager_queue_want_close(struct evws_connection *connection);
+
+int manager_queue_want_is_cancelled(struct manager_queue_want *want);
+struct evws_connection *manager_queue_want_get_connection(
+  struct manager_queue_want *want);
+const char *manager_queue_want_get_identifier(struct manager_queue_want *want);
