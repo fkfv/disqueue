@@ -268,7 +268,7 @@ void queue_item_unlock(struct queue_item *item)
   item->lockcount--;
 
   /* handle if this item is now ready to be freed */
-  if (item->lockcount == 0) {
+  if (item->lockcount == 0 && !item->inserted) {
     queue_item_free(item);
   }
 }
