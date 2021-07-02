@@ -52,9 +52,15 @@ struct manager_queue_want {
   struct evws_connection *client;
 };
 
-struct manager_context {
+struct manager_server {
+  LIST_ENTRY(manager_server) next;
+
   struct evhttp *http;
   struct evws *ws;
+};
+
+struct manager_context {
+  LIST_HEAD(mshead, manager_server) servers;
 
   /* queues being managed */
   TAILQ_HEAD(mqhead, manager_queue) queues;

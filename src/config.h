@@ -20,19 +20,21 @@
   THE SOFTWARE.
 */
 
-/* reset the configuration */
-void config_reset(void);
+struct config_server;
 
-/* load configuration from file or defaults*/
-int config_parse(const char *filename);
-int config_load_defaults(void);
+int config_load_file(const char *filename);
+void config_free(void);
 
-/* set configuration */
-int config_set_string(const char *option, const char *value);
-int config_set_int(const char *option, int value);
-int config_set_short(const char *option, short value);
+/* iterate config_server instances. iter_server_begin should be called to start
+   iteration, iter_server_next will return config_server and null when the last
+   one has been consumed, then iter_server_close will finish */
+int config_iter_server_begin(void);
+void config_iter_server_close(void);
+struct config_server *config_iter_server_next(void);
 
-/* get configuration */
-const char *config_get_string(const char *name);
-int config_get_int(const char *name);
-short config_get_short(const char *name);
+/* get properties from a config_server */
+const char *config_server_get_hostname(struct config_server *server);
+unsigned short config_server_get_port(struct config_server *server);
+int config_server_has_security(struct config_server *server);
+const char *config_server_get_certificate(struct config_server *server);
+const char *config_server_get_privatekey(struct config_server *server);

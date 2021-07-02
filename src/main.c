@@ -30,58 +30,60 @@
 #include "ws.h"
 #include "manager.h"
 #include "getopt.h"
+#include "ssl.h"
 
-#define options "a:p:c:h"
+#define options "c:h"
 
-/* start and run libevent */
-int event_startup(const char *hostname, short port)
+int create_server(struct event_base *base, struct config_server *server)
 {
-  struct event_base *base;
-  struct evhttp *http;
-  struct evws *ws;
-#ifdef _WIN32
-  WSADATA wsa;
-
-  WSAStartup(MAKEWORD(2, 2), &wsa);
-#endif
-
-  base = event_base_new();
-  if (!base) {
-    return 1;
-  }
+  struct evhttp *http = NULL;
+  struct evws *ws = NULL;
 
   http = evhttp_new(base);
   if (!http) {
-    event_base_free(base);
-    return 1;
+    goto error;
   }
 
-  if (evhttp_bind_socket(http, hostname, port) != 0) {
-    evhttp_free(http);
-    event_base_free(base);
-    return 1;
+  if (evhttp_bind_socket(http,
+                         config_server_get_hostname(server),
+                         config_server_get_port(server)) != 0) {
+    goto error;
   }
 
   ws = evws_new(http);
   if (!ws) {
-    evhttp_free(http);
-    event_base_free(base);
-    return 1;
+    goto error;
   }
 
-  manager_startup(http, ws);
+  if (config_server_has_security(server)) {
+    if (!ssl_setup()) {
+      goto error;
+    }
 
-  if (event_base_dispatch(base) == -1) {
-    evhttp_free(http);
-    event_base_free(base);
-    return 1;
+    if (!ssl_load_certificate(config_server_get_certificate(server)) ||
+        !ssl_load_privatekey(config_server_get_privatekey(server))) {
+      goto error;
+    }
+
+    ssl_use(http);
   }
 
-  manager_shutdown();
+  if (!manager_add_server(http, ws)) {
+    goto error;
+  }
 
-#ifdef _WIN32
-  WSACleanup();
-#endif
+  return 1;
+
+error:
+  ssl_destroy();
+
+  if (http) {
+    evhttp_free(http);
+  }
+
+  if (ws) {
+    evws_free(ws);
+  }
 
   return 0;
 }
@@ -89,9 +91,8 @@ int event_startup(const char *hostname, short port)
 void usage(const char *progname)
 {
   printf("-- %s\n", progname);
-  printf("  -c [config file]: load configuration from file (default: none)\n");
-  printf("  -a [address]    : listen on address (default: 127.0.0.1)\n");
-  printf("  -p [port]       : listen on port (default: 3682)\n");
+  printf("  -c [config file]: load configuration from file - default config\n"\
+         "      is to run a server on 127.0.0.1:3682\n");
   printf("  -h              : show help\n");
 }
 
@@ -102,19 +103,11 @@ int command_line(int argc, char *argv[])
   int c;
   int show_help = 0;
   const char *config_file = NULL;
-  const char *hostname = NULL;
-  const char *port = NULL;
 
   while ((c = getopt(argc, argv, options)) != -1) {
     switch (c) {
     case 'c':
       config_file = optarg;
-      break;
-    case 'a':
-      hostname = optarg;
-      break;
-    case 'p':
-      port = optarg;
       break;
     case 'h':
       show_help = 1;
@@ -138,44 +131,60 @@ int command_line(int argc, char *argv[])
   }
 
   if (config_file) {
-    if (!config_parse(config_file)) {
+    if (!config_load_file(config_file)) {
       fprintf(stderr, "failed to load %s\n", config_file);
-      return 0;
+      return EINVAL;
     }
   }
 
-  if (hostname) {
-    if (!config_set_string("/host", hostname)) {
-      fprintf(stderr, "failed to set hostname\n");
-      return 0;
-    }
-  }
-
-  if (port) {
-    if (!config_set_short("/port", (short)atoi(port))) {
-      fprintf(stderr, "failed to set port\n");
-      return 0;
-    }
-  }
-
-  return 1;
+  return -1;
 }
 
 int main(int argc, char *argv[])
 {
-  const char *hostname;
-  short port;
+  int c;
+  struct config_server *server;
+  struct event_base *base;
+#ifdef _WIN32
+  WSADATA wsa;
 
-  if (!config_load_defaults()) {
+  WSAStartup(MAKEWORD(2, 2), &wsa);
+#endif
+
+  if ((c = command_line(argc, argv)) != -1) {
+    return c;
+  }
+
+  if (!config_iter_server_begin()) {
+    fprintf(stderr, "no servers to run on\n");
     return 1;
   }
 
-  if (command_line(argc, argv) != 1) {
-    return 0;
+  base = event_base_new();
+  if (!base) {
+    fprintf(stderr, "failed to start libevent\n");
+    return 1;
   }
 
-  hostname = config_get_string("/host");
-  port = config_get_short("/port");
+  manager_startup();
 
-  return event_startup(hostname, port);
+  while ((server = config_iter_server_next()) != NULL) {
+    if (!create_server(base, server)) {
+      fprintf(stderr, "failed to add server\n");
+      return 1;
+    }
+  }
+
+  if (event_base_dispatch(base) == -1) {
+    fprintf(stderr, "failed to run libevent loop\n");
+    return 1;
+  }
+
+  manager_shutdown();
+
+#ifdef _WIN32
+  WSACleanup();
+#endif
+
+  return 0;
 }

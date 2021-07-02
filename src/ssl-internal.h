@@ -20,30 +20,21 @@
   THE SOFTWARE.
 */
 
-#include "queue-compat.h"
-#include <json-c/json_object.h>
+#include <openssl/ssl.h>
+#include <openssl/safestack.h>
 
-struct config_server {
-  LIST_ENTRY(config_server) next;
+struct ssl_context {
+  int ssl_initialised;
 
-  const char *hostname;
-  unsigned short port;
+  /* has the keypair loaded - 0 indicates none, 1 indicates partial and 2
+     indicates fully loaded */
+  int keypair_loaded;
 
-  const char *certificate;
-  const char *privatekey;
+  /* openssl context */
+  SSL_CTX *ssl_ctx;
 };
 
-struct config_context {
-  LIST_HEAD(cshead, config_server) servers;
+SSL *ssl_create_connection(void);
+struct bufferevent *ssl_create_bufferevent(struct event_base *base, void *user);
 
-  /* the object backing the string values used in each server. releasing this
-     object will invalidate the loaded configuration. */
-  struct json_object *object;
-
-  /* current iteration item */
-  struct config_server *current_iter;
-};
-
-int config_process_server_(struct json_object *server);
-
-extern struct config_context global_config_context_;
+extern struct ssl_context ssl_global_context_;

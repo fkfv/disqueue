@@ -20,30 +20,17 @@
   THE SOFTWARE.
 */
 
-#include "queue-compat.h"
-#include <json-c/json_object.h>
+#include <event2/event.h>
+#include <event2/bufferevent.h>
+#include <event2/http.h>
 
-struct config_server {
-  LIST_ENTRY(config_server) next;
+/* setup and shutdown SSL */
+int ssl_setup(void);
+void ssl_destroy(void);
 
-  const char *hostname;
-  unsigned short port;
+/* load keypair */
+int ssl_load_certificate(const char *filename);
+int ssl_load_privatekey(const char *filename);
 
-  const char *certificate;
-  const char *privatekey;
-};
-
-struct config_context {
-  LIST_HEAD(cshead, config_server) servers;
-
-  /* the object backing the string values used in each server. releasing this
-     object will invalidate the loaded configuration. */
-  struct json_object *object;
-
-  /* current iteration item */
-  struct config_server *current_iter;
-};
-
-int config_process_server_(struct json_object *server);
-
-extern struct config_context global_config_context_;
+/* use the ssl context for a http server */
+void ssl_use(struct evhttp *http);

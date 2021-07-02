@@ -27,7 +27,8 @@
 struct manager_queue;
 struct manager_queue_want;
 
-void manager_startup(struct evhttp *http, struct evws *ws);
+void manager_startup(void);
+int manager_add_server(struct evhttp *http, struct evws *ws);
 void manager_shutdown(void);
 
 struct manager_queue *manager_queue_get(const char name[QUEUE_UUID_STR_LEN],

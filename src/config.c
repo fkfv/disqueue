@@ -20,311 +20,155 @@
   THE SOFTWARE.
 */
 
-#include <stdio.h>
-#include <limits.h>
-#include <json-c/json_tokener.h>
+#include <json-c/json_util.h>
 #include <json-c/json_pointer.h>
-#include <json-c/linkhash.h>
+#include <limits.h>
+#include <stdlib.h>
 #include "config.h"
 #include "config-internal.h"
-#include "strcase.h"
 
-enum config_default_type {
-  config_int,
-  config_short,
-  config_string
-};
+struct config_context global_config_context_ = {0};
 
-struct config_default {
-  const char *key;
-  enum config_default_type type;
-  union {
-    const char *string;
-    int _int;
-    short _short;
-  } value;
-} config_defaults[] = {
-  {"/port", config_short, {._short = 3682}},
-  {"/host", config_string, {.string="127.0.0.1"}},
-  {NULL, config_int, {._int = 0}}
-};
+/* likely size that the configuration would fit in. must be less than INT_MAX
+   even though fread returns size_t */
+#define CONFIG_BUF_SIZE 4096
 
-/* a buffer size that is reasonable to use on stack and likely to include all
-   of the configuration. must be less than INT_MAX */
-#define CONFIG_LIKELY_LENGTH 4096
-
-struct json_object *config_object = NULL;
-
-struct config_default *config_get_default(const char *name,
-                                          enum config_default_type type)
+int config_load_file(const char *filename)
 {
-  struct config_default *default_value = config_defaults;
+  struct json_object *servers;
+  struct json_object *server;
+  size_t server_count;
+  size_t index;
 
-  while (default_value->key) {
-    if (!strcasecmp(default_value->key, name)) {
-      if (default_value->type != type) {
-        return NULL;
-      } else {
-        return default_value;
-      }
-    }
-
-    default_value++;
+  global_config_context_.object = json_object_from_file(filename);
+  if (!global_config_context_.object) {
+    return 0;
   }
 
-  return NULL;
-}
-
-void config_reset(void)
-{
-  json_object_put(config_object);
-  config_object = NULL;
-}
-
-int config_parse(const char *filename)
-{
-  FILE *fd = NULL;
-  struct json_tokener *tokener = NULL;
-  struct json_object *object;
-  enum json_tokener_error error = json_tokener_continue;
-  char buf[CONFIG_LIKELY_LENGTH];
-  int retval = 0;
-  size_t readsize = 0;
-
-  fd = fopen(filename, "r");
-  if (!fd) {
-    goto cleanup;
+  servers = json_object_object_get(global_config_context_.object, "servers");
+  if (!servers || json_object_get_type(servers) != json_type_array) {
+    return 0;
   }
 
-  tokener = json_tokener_new();
-  if (!tokener) {
-    goto cleanup;
-  }
-
-  do {
-    if ((readsize = fread(buf, 1, CONFIG_LIKELY_LENGTH, fd)) <= 0) {
-      /* break - error will be json_tokener_continue if we still excpected more
-         json data */
-      break;
-    }
-
-    if (ferror(fd)) {
-      /* break - cannot read the file, error will be json_tokener_continue from
-         the initialisation */
-      break;
-    }
-
-    object = json_tokener_parse_ex(tokener, buf, (int)readsize);
-  } while ((error = json_tokener_get_error(tokener)) == json_tokener_continue);
-
-  if (error != json_tokener_success) {
-    goto cleanup;
-  }
-
-  /* replace existing configuration with new values */
-  if (config_object != NULL) {
-    config_merge_objects_(config_object, object);
-  } else {
-    config_object = object;
-  }
-
-  /* successfully loaded configuration */
-  retval = 1;
-
-cleanup:
-  if (fd) {
-    fclose(fd);
-  }
-
-  if (tokener) {
-    json_tokener_free(tokener);
-  }
-
-  return retval;
-}
-
-int config_load_defaults(void)
-{
-  struct config_default *default_value;
-
-  if (!config_object) {
-    config_object = json_object_new_object();
-    if (!config_object) {
+  server_count = json_object_array_length(servers);
+  for (index = 0; index < server_count; index++) {
+    server = json_object_array_get_idx(servers, index);
+    if (!server || !config_process_server_(server)) {
       return 0;
     }
-  }
-
-  default_value = config_defaults;
-  while (default_value->key) {
-    /* only add the default if the key does not exist */
-    if (json_pointer_get(config_object, default_value->key, NULL) &&
-        errno == ENOENT) {
-      switch (default_value->type) {
-      case config_string:
-        if (!config_set_string(default_value->key,
-                               default_value->value.string)) {
-          return 0;
-        }
-        break;
-      case config_int:
-        if (!config_set_int(default_value->key,
-                            default_value->value._int)) {
-          return 0;
-        }
-        break;
-      case config_short:
-        if (!config_set_short(default_value->key,
-                              default_value->value._short)) {
-          return 0;
-        }
-        break;
-      }
-    }
-
-    default_value++;
   }
 
   return 1;
 }
 
-int config_set_string(const char *option, const char *value)
+void config_free(void)
 {
-  struct json_object *string;
+  json_object_put(global_config_context_.object);
+}
 
-  string = json_object_new_string(value);
-  if (!string) {
+int config_iter_server_begin(void)
+{
+  if (global_config_context_.current_iter) {
     return 0;
   }
 
-  return config_set_(option, string);
+  global_config_context_.current_iter =
+    LIST_FIRST(&global_config_context_.servers);
+  return global_config_context_.current_iter != NULL;
 }
 
-int config_set_int(const char *option, int value)
+void config_iter_server_close(void)
 {
-  struct json_object *integer;
-
-  integer = json_object_new_int(value);
-  if (!integer) {
-    return 0;
-  }
-
-  return config_set_(option, integer);
+  global_config_context_.current_iter = NULL;
 }
 
-int config_set_short(const char *option, short value)
+struct config_server *config_iter_server_next(void)
 {
-  return config_set_int(option, (int)value);
-}
+  struct config_server *iter = global_config_context_.current_iter;
 
-const char *config_get_string(const char *name)
-{
-  struct json_object *string;
-  struct config_default *default_value;
-
-  string = config_get_(name);
-  if (!string) {
-    default_value = config_get_default(name, config_string);
-    if (!default_value) {
-      return NULL;
-    }
-
-    return default_value->value.string;
-  }
-
-  return json_object_get_string(string);
-}
-
-int config_get_int(const char *name)
-{
-  struct json_object *integer;
-  struct config_default *default_value;
-
-  /* json-c can coerce types, so we will let it try to do so. it fails by
-     setting the integer to zero, which might be different from default_value
-     but we can still return default_value if the key does not exist */
-  integer = config_get_(name);
-  if (!integer) {
-    default_value = config_get_default(name, config_int);
-    if (!default_value) {
-      return 0;
-    }
-
-    return default_value->value._int;
-  }
-
-  return json_object_get_int(integer);
-}
-
-short config_get_short(const char *name)
-{
-  struct json_object *integer;
-  struct config_default *default_value;
-  int value;
-
-  /* get the type as an integer, and place it in the bounds of short */
-  integer = config_get_(name);
-  if (!integer) {
-    default_value = config_get_default(name, config_short);
-    if (!default_value) {
-      return (short)0;
-    }
-
-    return default_value->value._short;
-  }
-
-  value = config_get_int(name);
-  if (value > SHRT_MAX) {
-    value = SHRT_MAX;
-  } else if (value < SHRT_MIN) {
-    value = SHRT_MIN;
-  }
-
-  return value;
-}
-
-int config_merge_objects_(struct json_object *first,
-                          struct json_object *second)
-{
-  int retval = 0;
-
-  /* verify that the objects are valid for combining */
-  if (json_object_get_object(second) == NULL &&
-      json_object_get_type(first) == json_type_object) {
-    goto cleanup;
-  }
-
-  /* add each key. increase the refcount, this leads to all of the keys from
-     the second object being owned by the first while still being able to
-     destroy the base object without going to the trouble of removing its
-     keys */
-  json_object_object_foreach(second, key, value) {
-    if (json_object_object_add(first, key, value) != 0) {
-      break;
-    }
-    json_object_get(value);
-  }
-
-  /* successfully combined */
-  retval = 1;
-
-cleanup:
-  json_object_put(second);
-
-  return retval;
-}
-
-int config_set_(const char *key, struct json_object *value)
-{
-  return json_pointer_set(&config_object, key, value) == 0;
-}
-
-struct json_object *config_get_(const char *key)
-{
-  struct json_object *object;
-
-  if (json_pointer_get(config_object, key, &object) != 0) {
+  if (iter == NULL) {
     return NULL;
   }
 
-  return object;
+  global_config_context_.current_iter =
+    LIST_NEXT(global_config_context_.current_iter, next);
+  return iter;
+}
+
+const char *config_server_get_hostname(struct config_server *server)
+{
+  return server->hostname;
+}
+
+unsigned short config_server_get_port(struct config_server *server)
+{
+  return server->port;
+}
+
+int config_server_has_security(struct config_server *server)
+{
+  return server->certificate && server->privatekey;
+}
+
+const char *config_server_get_certificate(struct config_server *server)
+{
+  return server->certificate;
+}
+
+const char *config_server_get_privatekey(struct config_server *server)
+{
+  return server->privatekey;
+}
+
+int config_process_server_(struct json_object *config)
+{
+  struct json_object *obj;
+  struct config_server *server;
+  int port;
+
+  server = calloc(1, sizeof(struct config_server));
+  if (!server) {
+    goto error;
+  }
+
+  if (json_pointer_get(config, "/hostname", &obj) ||
+      !(server->hostname = json_object_get_string(obj))) {
+    goto error;
+  }
+
+  if (json_pointer_get(config, "/port", &obj) ||
+      !(port = json_object_get_int(obj))) {
+    goto error;
+  }
+
+  if (port <= 0 || port > SHRT_MAX) {
+    goto error;
+  }
+  server->port = (unsigned short)port;
+
+  if (!json_pointer_get(config, "/security/certificate", &obj)) {
+    /* check that it is possible the certificate may point to a file if
+       defined */
+    server->certificate = json_object_get_string(obj);
+    if (!server->certificate) {
+      goto error;
+    }
+
+    /* only try and get the privatekey if we had a certificate, and fail if the
+       private key is not also present */
+    if (json_pointer_get(config, "/security/privatekey", &obj) ||
+        !(server->privatekey = json_object_get_string(obj))) {
+      goto error;
+    }
+  }
+
+  LIST_INSERT_HEAD(&global_config_context_.servers, server, next);
+  return 1;
+
+error:
+  if (server) {
+    free(server);
+  }
+
+  return 0;
 }
