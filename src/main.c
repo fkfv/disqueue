@@ -69,7 +69,13 @@ int event_startup(const char *hostname, short port)
     return 1;
   }
 
-  manager_startup(http, ws);
+  manager_startup();
+  if (!manager_add_server(http, ws)) {
+    evws_free(ws);
+    evhttp_free(http);
+    event_base_free(base);
+    return 1;
+  }
 
   if (event_base_dispatch(base) == -1) {
     evhttp_free(http);

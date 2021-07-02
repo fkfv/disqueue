@@ -36,13 +36,24 @@
 
 struct manager_context manager_context_;
 
-void manager_startup(struct evhttp *http, struct evws *ws)
+void manager_startup(void)
 {
-  manager_context_.http = http;
-  manager_context_.ws = ws;
-
+  LIST_INIT(&manager_context_.servers);
   TAILQ_INIT(&manager_context_.queues);
   TAILQ_INIT(&manager_context_.wants);
+}
+
+int manager_add_server(struct evhttp *http, struct evws *ws)
+{
+  struct manager_server *server;
+
+  server = calloc(1, sizeof(struct manager_server));
+  if (!server) {
+    return 0;
+  }
+
+  server->http = http;
+  server->ws = ws;
 
   /* create http callbacks */
   evhttp_set_cb(http, "/queues", connection_http_callback_queues, NULL);
@@ -56,20 +67,26 @@ void manager_startup(struct evhttp *http, struct evws *ws)
   evws_set_cb(ws, connection_ws_callback_wait, NULL);
   evws_set_close_cb(ws, connection_ws_callback_close, NULL);
   evws_set_error_cb(ws, connection_ws_callback_error, NULL);
+
+  LIST_INSERT_HEAD(&manager_context_.servers, server, next);
+  return 1;
 }
 
 void manager_shutdown(void)
 {
   struct manager_queue_want *want;
   struct manager_queue *queue;
+  struct manager_server *server;
 
-  evhttp_del_cb(manager_context_.http, "/queues");
-  evhttp_del_cb(manager_context_.http, "/queue");
-  evhttp_del_cb(manager_context_.http, "/take");
-  evhttp_del_cb(manager_context_.http, "/peek");
-  evhttp_del_cb(manager_context_.http, "/put");
+  while ((server = LIST_FIRST(&manager_context_.servers)) != NULL) {
+    evhttp_del_cb(server->http, "/queues");
+    evhttp_del_cb(server->http, "/queue");
+    evhttp_del_cb(server->http, "/take");
+    evhttp_del_cb(server->http, "/peek");
+    evhttp_del_cb(server->http, "/put");
 
-  evws_unbind_path(manager_context_.ws, "/take/ws");
+    evws_unbind_path(server->ws, "/take/ws");
+  }
 
   while ((want = TAILQ_FIRST(&manager_context_.wants)) != NULL) {
     /* removes self from queue */
