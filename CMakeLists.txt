@@ -25,6 +25,8 @@ configure_file (src/strcase.h.in strcase.h)
 configure_file (src/hostnet.h.in hostnet.h)
 configure_file (src/getopt.h.in getopt.h)
 
+configure_file (src/config.json config.json COPYONLY)
+
 set (EXTRA_SOURCE "")
 
 if (NOT HAVE_GETOPT)

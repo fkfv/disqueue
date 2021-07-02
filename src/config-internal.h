@@ -20,15 +20,30 @@
   THE SOFTWARE.
 */
 
+#include "queue-compat.h"
 #include <json-c/json_object.h>
 
-/* merge two config objects together. merge is shallow, only surface level
-   objects will be merged. keys in the second object will be used if they are
-   present in both objects. the merged object will be placed in first */
-int config_merge_objects_(struct json_object *first,
-                          struct json_object *second);
+struct config_server {
+  LIST_ENTRY(config_server) next;
 
-int config_set_(const char *key, struct json_object *value);
-struct json_object *config_get_(const char *key);
+  const char *hostname;
+  unsigned short port;
 
-extern struct json_object *config_object;
+  const char *certificate;
+  const char *privatekey;
+};
+
+struct config_context {
+  LIST_HEAD(cshead, config_server) servers;
+
+  /* the object backing the string values used in each server. releasing this
+     object will invalidate the loaded configuration. */
+  struct json_object *object;
+
+  /* current iteration item */
+  struct config_server *current_iter;
+};
+
+int config_process_server_(struct json_object *server);
+
+extern struct config_context global_config_context_;

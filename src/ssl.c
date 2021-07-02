@@ -62,6 +62,10 @@ void ssl_destroy(void)
 
 int ssl_load_certificate(const char *filename)
 {
+  if (ssl_global_context_.keypair_loaded) {
+    return 1;
+  }
+
   if (SSL_CTX_use_certificate_file(ssl_global_context_.ssl_ctx, filename,
                                    SSL_FILETYPE_PEM) <= 0) {
     ERR_print_errors_fp(stderr);
@@ -74,6 +78,10 @@ int ssl_load_certificate(const char *filename)
 
 int ssl_load_privatekey(const char *filename)
 {
+  if (ssl_global_context_.keypair_loaded == 2) {
+    return 1;
+  }
+
   if (SSL_CTX_use_PrivateKey_file(ssl_global_context_.ssl_ctx, filename,
                                   SSL_FILETYPE_PEM) <= 0) {
     ERR_print_errors_fp(stderr);
