@@ -40,6 +40,7 @@ add_executable (disqueue
   src/connection-http.c
   src/connection-ws.c
   src/config.c
+  src/ssl.c
   ${EXTRA_SOURCE}
   )
 
