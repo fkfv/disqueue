@@ -16,10 +16,12 @@ class QueueClient:
     
     url: str
     queue_id: str
+    auth: typing.Dict[str, str]
 
-    def __init__(self, url: str, queue_id: str):
+    def __init__(self, url: str, queue_id: str, auth: typing.Dict[str, str]):
       self.url = url
       self.queue_id = queue_id
+      self.auth = auth
 
     def put(self, key: typing.Optional[str], value: str):
         """Put a message in the queue."""
@@ -58,13 +60,14 @@ class QueueClient:
         self.info()
 
     def _request(self, path: str, method: str = 'POST', \
-                 params: typing.Dict[str, str] = {}) -> ProtocolMessage:
+                 params: typing.Dict[str, str] = {}, auth=None \
+                 ) -> ProtocolMessage:
         params = params.copy()
         params.update({
             'name': self.queue_id
             })
 
-        return _request(self.url, path, method, params)
+        return _request(self.url, path, method, params, auth)
 
     @staticmethod
     def _with_key(params: typing.Dict[str, str], \
@@ -78,20 +81,20 @@ class QueueClient:
         return params
 
 
-def queue_create(url, name: str = None) -> str:
+def queue_create(url, name: str = None, auth: typing.Dict[str, str] = None) -> str:
     """Create a new queue and return the name."""
-    return _request(url, '/queues', 'POST', {}).payload
+    return _request(url, '/queues', 'POST', {}, auth).payload
 
 
-def queue_list(url) -> typing.List[str]:
+def queue_list(url, auth: typing.Dict[str, str] = None) -> typing.List[str]:
     """Get a list the names of all queues."""
-    return _request(url, '/queues', 'GET', {}).payload
+    return _request(url, '/queues', 'GET', {}, auth).payload
 
 def _request(url: str, path: str, method: str, \
-             params: typing.Dict[str, str]) -> ProtocolMessage:
+             params: typing.Dict[str, str], auth=None) -> ProtocolMessage:
     try:
         response = requests.request(method, urljoin(url, path),
-                                    data=params)
+                                    data=params, auth=auth)
         return protocol_parse(response.text)
     except HTTPError as error:
         return protocol_parse(error.response.text)

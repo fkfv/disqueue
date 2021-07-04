@@ -39,13 +39,15 @@ class Disqueue:
     # Connection URLs
     url: str = ''
     connection_tuple: typing.Tuple[str, int] = tuple()
+    auth: typing.Tuple[str, str] = None
 
-    def __init__(self, url):
+    def __init__(self, url, auth: typing.Tuple[str, str] = None):
         ws_url, connection_tuple = Disqueue._create_websocket_address(url)
         self.url = url
         self.factory = WebSocketClientFactory(ws_url)
         self.factory.protocol = DisqueueWebSocketProtocol
         self.connection_tuple = connection_tuple
+        self.auth = auth
 
         # The protocol will be able to access this client using the same name -
         # self.factory.client
@@ -97,7 +99,7 @@ class Disqueue:
         if queue_id in self.cached_clients:
             return self.cached_clients[queue_id]
 
-        client = QueueClient(self.url, queue_id)
+        client = QueueClient(self.url, queue_id, self.auth)
         client.info()
 
         # Only cache the client if the queue was valid

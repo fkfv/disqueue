@@ -1,6 +1,8 @@
 import json
 import typing
+from autobahn.websocket.types import ConnectingRequest
 from autobahn.asyncio.websocket import WebSocketClientProtocol
+from base64 import b64encode
 
 
 class QueueException(Exception):
@@ -21,7 +23,7 @@ class ProtocolMessage:
                  payload: typing.Any = None):
         self.success = success
 
-        if message:
+        if not success:
             self.message = message
         else:
             self._payload = payload
@@ -58,6 +60,18 @@ class DisqueueWebSocketProtocol(WebSocketClientProtocol):
     # The client that created the factory that created this protocol instance
     # factory.client: Disqueue
 
+    def onConnecting(self, details):
+        auth = self.factory.client.auth
+        if auth is not None:
+            auth = b64encode(':'.join(auth).encode('utf-8')).decode('utf-8')
+            return ConnectingRequest(
+                host=self.factory.host,
+                port=self.factory.port,
+                resource=self.factory.resource,
+                headers={
+                    'Authorization': f'Basic {auth}'
+                })
+
     def onMessage(self, payload, isBinary):
         payload = payload.decode('utf-8')
         message = parse(payload)
@@ -81,7 +95,7 @@ def parse(data: str) -> ProtocolMessage:
             payload = None
 
             if success:
-                payload = protocol.get('payload')
+                payload = protocol.get('payload', {})
             else:
                 message = protocol['message']
         except KeyError as e:
