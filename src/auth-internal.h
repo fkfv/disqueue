@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef AUTH_INTERNAL_H
+#define AUTH_INTERNAL_H
+
 #include <openssl/evp.h>
 #include "queue-compat.h"
 
@@ -75,3 +78,5 @@ int auth_plaintext_set_password_file_(struct auth_plaintext *auth,
 int auth_plaintext_plain_codec_(const char *file, const char *provided);
 
 int auth_plaintext_update_(struct auth_plaintext *auth);
+
+#endif

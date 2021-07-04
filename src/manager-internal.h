@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef MANAGER_INTERNAL_H
+#define MANAGER_INTERNAL_H
+
 #include <event2/http.h>
 #include "ws.h"
 #include "queue-compat.h"
@@ -71,3 +74,5 @@ struct manager_context {
 
 /* the global context instance */
 extern struct manager_context manager_context_;
+
+#endif

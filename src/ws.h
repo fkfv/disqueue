@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef WS_H
+#define WS_H
+
 #include <event2/http.h>
 #include <wslay/wslay.h>
 
@@ -115,3 +118,5 @@ ev_uint8_t evws_message_get_opcode(struct evws_message *msg);
  * @param conn an evws_message that is still in the callback stage
  */
 void evws_message_own(struct evws_message *msg);
+
+#endif

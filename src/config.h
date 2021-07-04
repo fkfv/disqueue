@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef CONFIG_H
+#define CONFIG_H
+
 struct config_server;
 
 int config_load_file(const char *filename);
@@ -38,3 +41,5 @@ unsigned short config_server_get_port(struct config_server *server);
 int config_server_has_security(struct config_server *server);
 const char *config_server_get_certificate(struct config_server *server);
 const char *config_server_get_privatekey(struct config_server *server);
+
+#endif

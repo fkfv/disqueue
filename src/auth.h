@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef AUTH_H
+#define AUTH_H
+
 struct auth;
 
 enum auth_method {
@@ -38,3 +41,5 @@ int auth_verify(struct auth *auth, const char *header);
 
 /* set auth file. supported algorithms: auth_plaintext */
 int auth_set_password_file(struct auth *auth, const char *file);
+
+#endif

@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef CONFIG_INTERNAL_H
+#define CONFIG_INTERNAL_H
+
 #include "queue-compat.h"
 #include <json-c/json_object.h>
 
@@ -47,3 +50,5 @@ struct config_context {
 int config_process_server_(struct json_object *server);
 
 extern struct config_context global_config_context_;
+
+#endif

@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef CONNECTION_INTERNAL_H
+#define CONNECTION_INTERNAL_H
+
 #include <json-c/json_object.h>
 #include <event2/keyvalq_struct.h>
 #include "manager.h"
@@ -64,3 +67,5 @@ void connection_http_callback_delete_(struct evhttp_request *request, void *);
 
 /* queue callbacks */
 void connection_queue_callback_wait_(struct queue_item *item, void *user);
+
+#endif

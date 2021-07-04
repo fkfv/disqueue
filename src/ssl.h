@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef SSL_H
+#define SSL_H
+
 #include <event2/event.h>
 #include <event2/bufferevent.h>
 #include <event2/http.h>
@@ -34,3 +37,5 @@ int ssl_load_privatekey(const char *filename);
 
 /* use the ssl context for a http server */
 void ssl_use(struct evhttp *http);
+
+#endif

@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef QUEUE_H
+#define QUEUE_H
+
 #include "queue-compat.h"
 
 #define QUEUE_UUID_LEN 16
@@ -74,3 +77,5 @@ void queue_item_unlock(struct queue_item *item);
    while the item may not be freed immediately if it was locked, the caller
    should not try to access the item after this function returns */
 void queue_item_free(struct queue_item *item);
+
+#endif

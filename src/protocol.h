@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef PROTOCOL_H
+#define PROTOCOL_H
+
 #include <json-c/json_object.h>
 #include "queue.h"
 
@@ -43,3 +46,5 @@ const char *protocol_failure_fallback(void);
 const char *protocol_failure_message(void);
 
 struct json_object *protocol_encode_item(struct queue_item *item);
+
+#endif

@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef MANAGER_H
+#define MANAGER_H
+
 #include <event2/http.h>
 #include "ws.h"
 #include "queue.h"
@@ -60,3 +63,5 @@ int manager_queue_want_is_cancelled(struct manager_queue_want *want);
 struct evws_connection *manager_queue_want_get_connection(
   struct manager_queue_want *want);
 const char *manager_queue_want_get_identifier(struct manager_queue_want *want);
+
+#endif

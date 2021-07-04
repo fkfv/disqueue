@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef CONNECTION_H
+#define CONNECTION_H
+
 #include <event2/http.h>
 #include "ws.h"
 #include "queue.h"
@@ -35,3 +38,5 @@ void connection_http_callback_put(struct evhttp_request *request, void *);
 void connection_ws_callback_wait(struct evws_message *message, void *);
 void connection_ws_callback_close(struct evws_connection *connection, void *);
 void connection_ws_callback_error(struct evws_connection *connection, void *);
+
+#endif

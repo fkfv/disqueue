@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef SSL_INTERNAL_H
+#define SSL_INTERNAL_H
+
 #include <openssl/ssl.h>
 #include <openssl/safestack.h>
 
@@ -38,3 +41,5 @@ SSL *ssl_create_connection(void);
 struct bufferevent *ssl_create_bufferevent(struct event_base *base, void *user);
 
 extern struct ssl_context ssl_global_context_;
+
+#endif

@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef QUEUE_INTERNAL_H
+#define QUEUE_INTERNAL_H
+
 struct queue;
 struct queue_item;
 
@@ -89,3 +92,5 @@ void queue_item_free_(struct queue_item *item);
 
 struct queue_callback *queue_callback_new_(const char *key);
 void queue_callback_free_(struct queue_callback *cb);
+
+#endif

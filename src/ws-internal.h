@@ -20,6 +20,9 @@
   THE SOFTWARE.
 */
 
+#ifndef WS_INTERNAL_H
+#define WS_INTERNAL_H
+
 #include "queue-compat.h"
 
 #include <event2/buffer.h>
@@ -114,3 +117,5 @@ struct evws_connection *evws_connection_new_(struct evhttp_connection *evcon);
 
 struct evws_message *evws_message_new_(struct evws_connection *conn,
                                        wslay_msg_arg arg);
+
+#endif
