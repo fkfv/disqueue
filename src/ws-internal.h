@@ -81,6 +81,9 @@ struct evws {
 
   void (*closecb)(struct evws_connection *, void *);
   void *closecbarg;
+
+  int (*upgradecb)(struct evhttp_request *request, void *);
+  void *upgradecbarg;
 };
 
 struct evws_message {

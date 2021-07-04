@@ -169,6 +169,13 @@ void evws_upgrade_http_cb_(struct evhttp_request *req, void *user)
     return;
   }
 
+  /* check if the upgrade cb would like to deny this upgrade */
+  if (ws->upgradecb) {
+    if (!ws->upgradecb(req, ws->upgradecbarg)) {
+      return;
+    }
+  }
+
   response_key = create_security_key(request_key);
   if (!response_key) {
     evhttp_send_error(req, HTTP_INTERNAL, NULL);
@@ -267,6 +274,14 @@ void evws_set_close_cb(struct evws *ws,
 {
   ws->closecb = cb;
   ws->closecbarg = arg;
+}
+
+void evws_set_upgrade_cb(struct evws *ws,
+                         int (*cb)(struct evhttp_request *request, void *),
+                         void *arg)
+{
+  ws->upgradecb = cb;
+  ws->upgradecbarg = arg;
 }
 
 void evws_free(struct evws *ws)

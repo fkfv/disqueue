@@ -85,6 +85,17 @@ void evws_set_error_cb(struct evws *ws,
 void evws_set_close_cb(struct evws *ws,
                        void (*cb)(struct evws_connection *, void *), void *arg);
 
+/**
+ * Set the callback to verify if a websocket can be upgraded.
+ *
+ * @param ws a pointer to an evws object
+ * @param cb the callback that returns 0 if the upgrade should be denied
+ * @param arg optional context argument for the callback
+ */
+void evws_set_upgrade_cb(struct evws *ws,
+                         int (*cb)(struct evhttp_request *request, void *),
+                         void *arg);
+
 void evws_free(struct evws *ws);
 
 /**
