@@ -11,6 +11,12 @@ All responses are in JSON. They all use the following format:
 
 All responses can have a 500 error code, this means that the server has failed.
 
+## Authentication
+The server has the option to enable authentication. If this is the case, the
+authentication should be sent as HTTP Basic authentication, which is with the
+header `Authorization: base64_encode(username ':' password)`. See
+[Security.md](Security.md#Authorization) for authorization setup details.
+
 ## Endpoints
  * [/queues  [GET]       - List all queues](#get-queues)
  * [/queues  [POST]      - Create new queue](#post-queues)
