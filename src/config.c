@@ -22,10 +22,12 @@
 
 #include <json-c/json_util.h>
 #include <json-c/json_pointer.h>
+#include <json-c/linkhash.h>
 #include <limits.h>
 #include <stdlib.h>
 #include "config.h"
 #include "config-internal.h"
+#include "strcase.h"
 
 struct config_context global_config_context_ = {0};
 
@@ -37,12 +39,23 @@ int config_load_file(const char *filename)
 {
   struct json_object *servers;
   struct json_object *server;
+  struct json_object *authentications;
   size_t server_count;
   size_t index;
 
   global_config_context_.object = json_object_from_file(filename);
   if (!global_config_context_.object) {
     return 0;
+  }
+
+  authentications = json_object_object_get(global_config_context_.object,
+                                           "authentication");
+  if (authentications) {
+    json_object_object_foreach(authentications, key, value) {
+      if (!config_process_authentication_(key, value)) {
+        return 0;
+      }
+    }
   }
 
   servers = json_object_object_get(global_config_context_.object, "servers");
@@ -120,10 +133,16 @@ const char *config_server_get_privatekey(struct config_server *server)
   return server->privatekey;
 }
 
+struct auth *config_server_get_authentication(struct config_server *server)
+{
+  return server->authentication->auth;
+}
+
 int config_process_server_(struct json_object *config)
 {
   struct json_object *obj;
   struct config_server *server;
+  const char *authentication;
   int port;
 
   server = calloc(1, sizeof(struct config_server));
@@ -162,6 +181,19 @@ int config_process_server_(struct json_object *config)
     }
   }
 
+  if (!json_pointer_get(config, "/authentication", &obj)) {
+    authentication = json_object_get_string(obj);
+    if (!authentication) {
+      goto error;
+    }
+
+    /* check that the authentication exists */
+    server->authentication = config_authentication_get_(authentication);
+    if (!server->authentication) {
+      goto error;
+    }
+  }
+
   LIST_INSERT_HEAD(&global_config_context_.servers, server, next);
   return 1;
 
@@ -171,4 +203,57 @@ error:
   }
 
   return 0;
+}
+
+int config_process_authentication_(const char *name,
+                                   struct json_object *config)
+{
+  struct json_object *obj;
+  struct config_authentication *authentication;
+
+  authentication = calloc(1, sizeof(struct config_authentication));
+  if (!authentication) {
+    goto error;
+  }
+
+  authentication->name = name;
+
+  if (json_pointer_get(config, "/type", &obj) ||
+      !(authentication->type = json_object_get_string(obj))) {
+    goto error;
+  }
+
+  if (json_pointer_get(config, "/file", &obj) ||
+      !(authentication->file = json_object_get_string(obj))) {
+    goto error;
+  }
+
+  authentication->auth = auth_method_from_string(authentication->type);
+  if (!authentication->auth) {
+    goto error;
+  }
+
+  LIST_INSERT_HEAD(&global_config_context_.authentications, authentication,
+                   next);
+  return 1;
+
+error:
+  if (authentication) {
+    free(authentication);
+  }
+
+  return 0;
+}
+
+struct config_authentication *config_authentication_get_(const char *name)
+{
+  struct config_authentication *authentication;
+
+  LIST_FOREACH(authentication, &global_config_context_.authentications, next) {
+    if (!strcasecmp(authentication->name, name)) {
+      return authentication;
+    }
+  }
+
+  return NULL;
 }

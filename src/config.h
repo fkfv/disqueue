@@ -23,7 +23,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include "auth.h"
+
 struct config_server;
+struct config_authentication;
 
 int config_load_file(const char *filename);
 void config_free(void);
@@ -41,5 +44,6 @@ unsigned short config_server_get_port(struct config_server *server);
 int config_server_has_security(struct config_server *server);
 const char *config_server_get_certificate(struct config_server *server);
 const char *config_server_get_privatekey(struct config_server *server);
+struct auth *config_server_get_authentication(struct config_server *server);
 
 #endif

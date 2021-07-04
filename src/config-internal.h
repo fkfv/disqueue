@@ -23,8 +23,23 @@
 #ifndef CONFIG_INTERNAL_H
 #define CONFIG_INTERNAL_H
 
-#include "queue-compat.h"
 #include <json-c/json_object.h>
+#include "queue-compat.h"
+#include "auth.h"
+
+struct config_authentication {
+  LIST_ENTRY(config_authentication) next;
+
+  /* name of authentication provider */
+  const char *name;
+
+  /* type of authentication and file store */
+  const char *type;
+  const char *file;
+
+  /* auth instance */
+  struct auth *auth;
+};
 
 struct config_server {
   LIST_ENTRY(config_server) next;
@@ -34,10 +49,14 @@ struct config_server {
 
   const char *certificate;
   const char *privatekey;
+
+  /* authentication used by this server */
+  struct config_authentication *authentication;
 };
 
 struct config_context {
   LIST_HEAD(cshead, config_server) servers;
+  LIST_HEAD(cahead, config_authentication) authentications;
 
   /* the object backing the string values used in each server. releasing this
      object will invalidate the loaded configuration. */
@@ -48,6 +67,10 @@ struct config_context {
 };
 
 int config_process_server_(struct json_object *server);
+int config_process_authentication_(const char *name,
+                                   struct json_object *config);
+
+struct config_authentication *config_authentication_get_(const char *name);
 
 extern struct config_context global_config_context_;
 
