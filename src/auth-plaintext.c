@@ -285,11 +285,8 @@ int auth_plaintext_plain_codec_(const char *file, const char *provided)
   const char *password_begin;
   size_t password_len;
 
-  password_begin = strrchr(file, '$');
-  if (!password_begin) {
-    return 0;
-  }
-  password_begin++;
+  /* skip type - we know the type will be valid and equal to plain */
+  password_begin = file + strlen("$plain$");
   password_len = strlen(password_begin);
 
   /* don't compare unless the lengths are the same */
@@ -347,7 +344,7 @@ int auth_entry_plaintext_add_(struct auth_plaintext *auth,
   }
   strncpy(entry->username, line, password_begin - line - 1);
 
-  entry->password = strdup(password_begin + 1);
+  entry->password = strdup(password_begin);
   if (!entry->password) {
     goto error;
   }
