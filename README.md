@@ -16,6 +16,37 @@ To instruct the build script on where to find these libraries, you can set
 `-DLIBEVENT_ROOT=/opt/libevent -DWSLAY_ROOT=/opt/wslay -DJSONC_ROOT=/opt/json-c`
 to specify the install prefix of the libraries.
 
+## Configuration
+An example configuration is provided in `src/config.json` and will be copied to
+the build directory. You can use a configuration file with the `-c` option.
+`~/disqueue$ disqueue -c config.json`
+
+The configuration structure is as follows:
+```javascript
+{
+  "servers": [
+    {
+      "hostname": "server hostname",
+      "port": 3682,
+      "security": {
+        "certificate": "PEM certificate path",
+        "privatekey": "PEM private key path"
+      },
+      "authentication": "authentication-name"
+    }
+  ],
+  "authentication": {
+    "authentication-name": {
+      "type": "authentication type (plaintext)",
+      "file": "authentication file"
+    }
+  }
+}
+```
+
+## Security
+See [Security.md](Security.md) for secure configurations of the server.
+
 ## Client
 Interacting with the Disqueue API is possible using regular HTTP/1.1 and
 WebSockets, see the [API.md](API.md) file. Using a prebuilt client will make
