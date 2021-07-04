@@ -43,6 +43,8 @@ add_executable (disqueue
   src/connection-ws.c
   src/config.c
   src/ssl.c
+  src/auth.c
+  src/auth-plaintext.c
   ${EXTRA_SOURCE}
   )
 
