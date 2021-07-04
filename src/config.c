@@ -138,6 +138,11 @@ struct auth *config_server_get_authentication(struct config_server *server)
   return server->authentication->auth;
 }
 
+const char *config_server_get_realm(struct config_server *server)
+{
+  return server->authentication->name;
+}
+
 int config_process_server_(struct json_object *config)
 {
   struct json_object *obj;
@@ -233,11 +238,19 @@ int config_process_authentication_(const char *name,
     goto error;
   }
 
+  if (!auth_set_password_file(authentication->auth, authentication->file)) {
+    goto error;
+  }
+
   LIST_INSERT_HEAD(&global_config_context_.authentications, authentication,
                    next);
   return 1;
 
 error:
+  if (authentication->auth) {
+    auth_free(authentication->auth);
+  }
+
   if (authentication) {
     free(authentication);
   }

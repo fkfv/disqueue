@@ -25,6 +25,9 @@
 #include "connection-internal.h"
 #include "protocol.h"
 
+#define BASIC_HEADER "Basic realm=\""
+#define BASIC_DEFAULT BASIC_HEADER "auth\""
+
 /* callback for the queue list operation, adds the name of each queue to the
    list */
 int list_foreach_callback(struct manager_queue *queue, void *user)
@@ -180,6 +183,47 @@ void connection_http_callback_put(struct evhttp_request *request,
   connection_http_payload_(request, &params, NULL);
 }
 
+void connection_http_authenticated(struct evhttp_request *request, void *user)
+{
+  struct connection_params *params = (struct connection_params *)user;
+  struct evkeyvalq *headers = evhttp_request_get_input_headers(request);
+  const char *authstring;
+
+  if ((authstring = evhttp_find_header(headers, "Authorization")) == NULL) {
+    connection_http_auth_required_(request, params->realm);
+    connection_http_error_(request, NULL, 401/*HTTP_UNAUTHENTICATED*/,
+                           "authentication required");
+    return;
+  }
+
+  if (!auth_verify(params->auth, authstring)) {
+    connection_http_error_(request, NULL, 403/*HTTP_FORBIDDEN*/,
+                           "authentication failed");
+    return;
+  }
+
+  params->cb(request, params->cb_arg);
+}
+
+void *connection_http_auth_callback(struct auth *auth, const char *realm,
+                                    void (*cb)(struct evhttp_request *, void *),
+                                    void *cb_arg)
+{
+  struct connection_params *params;
+
+  params = calloc(1, sizeof(struct connection_params));
+  if (!params) {
+    return NULL;
+  }
+
+  params->auth = auth;
+  params->realm = realm;
+  params->cb = cb;
+  params->cb_arg = cb_arg;
+
+  return params;
+}
+
 struct manager_queue *connection_http_validate_(struct evhttp_request *request,
                                                 int create_new,
                                                 struct evkeyvalq *params)
@@ -305,6 +349,28 @@ void connection_http_payload_(struct evhttp_request *request,
   }
 
   connection_http_json_(request, params, HTTP_OK, object);
+}
+
+void connection_http_auth_required_(struct evhttp_request *request,
+                                    const char *realm)
+{
+  char *header;
+  struct evkeyvalq *headers = evhttp_request_get_output_headers(request);
+
+  header = calloc(1, strlen(realm) + strlen(BASIC_HEADER) + 2/*NULL, quote*/);
+  if (!header) {
+    goto error;
+  }
+
+  strcpy(header, BASIC_HEADER);
+  strcat(header, realm);
+  strcat(header, "\"");
+  evhttp_add_header(headers, "WWW-Authenticate", header);
+  free(header);
+  return;
+
+error:
+  evhttp_add_header(headers, "WWW-Authenticate", BASIC_DEFAULT);
 }
 
 void connection_http_callback_list_(struct evhttp_request *request,

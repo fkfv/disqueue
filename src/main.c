@@ -38,6 +38,8 @@ int create_server(struct event_base *base, struct config_server *server)
 {
   struct evhttp *http = NULL;
   struct evws *ws = NULL;
+  struct auth *auth = NULL;
+  const char *realm = NULL;
 
   http = evhttp_new(base);
   if (!http) {
@@ -68,7 +70,10 @@ int create_server(struct event_base *base, struct config_server *server)
     ssl_use(http);
   }
 
-  if (!manager_add_server(http, ws)) {
+  auth = config_server_get_authentication(server);
+  realm = config_server_get_realm(server); 
+
+  if (!manager_add_server(http, ws, auth, realm)) {
     goto error;
   }
 

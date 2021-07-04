@@ -45,5 +45,6 @@ int config_server_has_security(struct config_server *server);
 const char *config_server_get_certificate(struct config_server *server);
 const char *config_server_get_privatekey(struct config_server *server);
 struct auth *config_server_get_authentication(struct config_server *server);
+const char *config_server_get_realm(struct config_server *server);
 
 #endif

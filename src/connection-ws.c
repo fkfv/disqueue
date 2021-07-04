@@ -40,6 +40,28 @@ const char *json_get_string(struct json_object *object, const char *key)
   return json_object_get_string(attribute);
 }
 
+int connection_ws_authenticated(struct evhttp_request *request, void *user)
+{
+  struct connection_params *params = (struct connection_params *)user;
+  struct evkeyvalq *headers = evhttp_request_get_input_headers(request);
+  const char *authstring;
+
+  if ((authstring = evhttp_find_header(headers, "Authorization")) == NULL) {
+    connection_http_auth_required_(request, params->realm);
+    connection_http_error_(request, NULL, 401/*HTTP_UNAUTHENTICATED*/,
+                           "authentication required");
+    return 0;
+  }
+
+  if (!auth_verify(params->auth, authstring)) {
+    connection_http_error_(request, NULL, 403/*HTTP_FORBIDDEN*/,
+                           "authentication failed");
+    return 0;
+  }
+
+  return 1;
+}
+
 void connection_ws_callback_wait(struct evws_message *message, void *user)
 {
   struct json_object *request;

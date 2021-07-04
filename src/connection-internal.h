@@ -28,6 +28,16 @@
 #include "manager.h"
 #include "ws.h"
 
+struct connection_params {
+  /* authentication for this callback */
+  struct auth *auth;
+  const char *realm;
+
+  /* real callback */
+  void (*cb)(struct evhttp_request *, void *);
+  void *cb_arg;
+};
+
 /* validate a request. if create_new is 1 this will succeed if the given queue
    name is none or valid, and create the queue. if the queue name is present
    but invalid or create_new is 0 and the queue does not exist the function
@@ -58,6 +68,10 @@ void connection_ws_error_(struct evws_connection *connection,
                           const char *message);
 void connection_ws_payload_(struct evws_connection *connection,
                             struct json_object *payload);
+
+/* create www-authenticate header */
+void connection_http_auth_required_(struct evhttp_request *request,
+                                    const char *realm);
 
 /* http callbacks */
 void connection_http_callback_list_(struct evhttp_request *request, void *);

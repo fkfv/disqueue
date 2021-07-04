@@ -43,7 +43,8 @@ void manager_startup(void)
   TAILQ_INIT(&manager_context_.wants);
 }
 
-int manager_add_server(struct evhttp *http, struct evws *ws)
+int manager_add_server(struct evhttp *http, struct evws *ws, struct auth *auth,
+                       const char *auth_realm)
 {
   struct manager_server *server;
 
@@ -55,12 +56,34 @@ int manager_add_server(struct evhttp *http, struct evws *ws)
   server->http = http;
   server->ws = ws;
 
-  /* create http callbacks */
-  evhttp_set_cb(http, "/queues", connection_http_callback_queues, NULL);
-  evhttp_set_cb(http, "/queue", connection_http_callback_queue, NULL);
-  evhttp_set_cb(http, "/take", connection_http_callback_take, NULL);
-  evhttp_set_cb(http, "/peek", connection_http_callback_peek, NULL);
-  evhttp_set_cb(http, "/put", connection_http_callback_put, NULL);
+  if (auth && auth_realm) {
+    evhttp_set_cb(http, "/queues", connection_http_authenticated,
+                  connection_http_auth_callback(auth, auth_realm,
+                  connection_http_callback_queues, NULL));
+    evhttp_set_cb(http, "/queue", connection_http_authenticated,
+                  connection_http_auth_callback(auth, auth_realm,
+                  connection_http_callback_queue, NULL));
+    evhttp_set_cb(http, "/take", connection_http_authenticated,
+                  connection_http_auth_callback(auth, auth_realm,
+                  connection_http_callback_take, NULL));
+    evhttp_set_cb(http, "/peek", connection_http_authenticated,
+                  connection_http_auth_callback(auth, auth_realm,
+                  connection_http_callback_peek, NULL));
+    evhttp_set_cb(http, "/put", connection_http_authenticated,
+                  connection_http_auth_callback(auth, auth_realm,
+                  connection_http_callback_put, NULL));
+
+    evws_set_upgrade_cb(ws, connection_ws_authenticated,
+                        connection_http_auth_callback(auth, auth_realm,
+                        NULL, NULL));
+  } else {
+    /* create http callbacks */
+    evhttp_set_cb(http, "/queues", connection_http_callback_queues, NULL);
+    evhttp_set_cb(http, "/queue", connection_http_callback_queue, NULL);
+    evhttp_set_cb(http, "/take", connection_http_callback_take, NULL);
+    evhttp_set_cb(http, "/peek", connection_http_callback_peek, NULL);
+    evhttp_set_cb(http, "/put", connection_http_callback_put, NULL);
+  }
 
   /* create ws callbacks */
   evws_bind_path(ws, "/take/ws");
