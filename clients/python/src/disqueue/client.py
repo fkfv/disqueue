@@ -60,14 +60,13 @@ class QueueClient:
         self.info()
 
     def _request(self, path: str, method: str = 'POST', \
-                 params: typing.Dict[str, str] = {}, auth=None \
-                 ) -> ProtocolMessage:
+                 params: typing.Dict[str, str] = {}) -> ProtocolMessage:
         params = params.copy()
         params.update({
             'name': self.queue_id
             })
 
-        return _request(self.url, path, method, params, auth)
+        return _request(self.url, path, method, params, self.auth)
 
     @staticmethod
     def _with_key(params: typing.Dict[str, str], \
@@ -83,12 +82,18 @@ class QueueClient:
 
 def queue_create(url, name: str = None, auth: typing.Dict[str, str] = None) -> str:
     """Create a new queue and return the name."""
-    return _request(url, '/queues', 'POST', {}, auth).payload
+    message = _request(url, '/queues', 'POST', {}, auth)
+    message.raise_on_error()
+
+    return message.payload
 
 
 def queue_list(url, auth: typing.Dict[str, str] = None) -> typing.List[str]:
     """Get a list the names of all queues."""
-    return _request(url, '/queues', 'GET', {}, auth).payload
+    message = _request(url, '/queues', 'GET', {}, auth)
+    message.raise_on_error()
+
+    return message.payload
 
 def _request(url: str, path: str, method: str, \
              params: typing.Dict[str, str], auth=None) -> ProtocolMessage:
