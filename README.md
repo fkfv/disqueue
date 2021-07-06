@@ -52,6 +52,7 @@ Interacting with the Disqueue API is possible using regular HTTP/1.1 and
 WebSockets, see the [API.md](API.md) file. Using a prebuilt client will make
 using Disqueue much easier. Try one of the following:
   * [clients/python](clients/python)
+  * [clients/typescript](clients/typescript)
 
 ## Compatibility
 disqueue is tested on Microsoft Windows and Ubuntu Linux, however all operating
