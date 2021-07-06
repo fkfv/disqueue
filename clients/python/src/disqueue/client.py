@@ -82,7 +82,11 @@ class QueueClient:
 
 def queue_create(url, name: str = None, auth: typing.Dict[str, str] = None) -> str:
     """Create a new queue and return the name."""
-    message = _request(url, '/queues', 'POST', {}, auth)
+    params = {}
+    if name:
+        params.update({'name': name})
+
+    message = _request(url, '/queues', 'POST', params, auth)
     message.raise_on_error()
 
     return message.payload

@@ -88,7 +88,12 @@ class QueueClient {
 
 async function queueCreate(url: string, name?: string,
                            auth?: QueueAuthentication): Promise<string> {
-  const message = await _request(url, '/queues', 'POST', {}, auth);
+  let params = {};
+  if (name !== undefined) {
+    params['name'] = name;
+  }
+
+  const message = await _request(url, '/queues', 'POST', params, auth);
   message.raiseOnError();
 
   return (message.payload as string);
