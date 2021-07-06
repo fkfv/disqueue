@@ -1,0 +1,35 @@
+{
+  "name": "disqueue",
+  "version": "0.0.1",
+  "description": "Disqueue TypeScript client",
+  "keywords": [
+    "disqueue",
+    "queue",
+    "distributed"
+  ],
+  "homepage": "https://github.com/fkfv/disqueue",
+  "bugs": "https://github.com/fkfv/disqueue/issues",
+  "license": "MIT",
+  "author": "fkfv <20618646+fkfv@users.noreply.github.com>",
+  "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fkfv/disqueue",
+    "directory": "clients/typescript"
+  },
+  "dependencies": {
+    "node-fetch": "2.6.1",
+    "ws": "7.5.2"
+  },
+  "devDependencies": {
+    "typescript": "4.3.5",
+    "eslint": "7.30.0",
+    "@typescript-eslint/parser": "4.28.2",
+    "@typescript-eslint/eslint-plugin": "4.28.2",
+    "@types/node": "16.0.0"
+  },
+  "scripts": {
+    "lint": "eslint . --ext .ts",
+    "build": "tsc"
+  }
+}
