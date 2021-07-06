@@ -15,18 +15,18 @@ import {Disqueue, queueList, queueCreate};
   const url = 'http://127.0.0.1:3682';
   const auth = ['test', 'test'];
 
-  const queues = queueList(url, auth);
+  const queues = await queueList(url, auth);
   let queueId;
   if (queues.length > 0) {
       queueId = queues[0];
   } else {
-      queueId = queueCreate(url, undefined, auth);
+      queueId = await queueCreate(url, undefined, auth);
   }
-  console.log(queueId)
+  console.log(queueId);
 
   const client = new Disqueue(url, auth);
   client.queueHandler(queueId)(function (key, value) {
-
+    console.log(key, value);
   });
 
   client.run();
