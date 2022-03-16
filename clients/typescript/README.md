@@ -9,7 +9,7 @@ in the LICENSE file.
 
 ## Example
 ```typescript
-import {Disqueue, queueList, queueCreate};
+import {Disqueue, queueList, queueCreate} from 'disqueue';
 
 (async function() {
   const url = 'http://127.0.0.1:3682';
